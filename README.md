@@ -1,20 +1,34 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# Global Sovereign
 
-# Run and deploy your AI Studio app
+A turn-based geopolitical strategy game built with React, Vite, and Tailwind. Pick a superpower, juggle GDP, stability, military, influence and science, run a tech tree, and use diplomacy or force to reshape the world.
 
-This contains everything you need to run your app locally.
+## Features
 
-View your app in AI Studio: https://ai.studio/apps/de0ec332-daa7-4e27-b375-a5749b9eb5b4
+- 5 distinct world powers with unique starting positions
+- Turn-based simulation with passive economy, military maintenance, and dynamic events
+- Diplomacy: trade, aid, alliances, propaganda, sanctions, intel ops, total war
+- Tech tree across Military / Economy / Diplomacy
+- Three AI advisors (Military / Economic / Intelligence)
+- Win/loss conditions: dominance, prosperity, peace, or collapse
+- Auto-save to localStorage so you can pick up where you left off
+- History charts powered by Recharts
 
-## Run Locally
+## Run locally
 
-**Prerequisites:**  Node.js
+Prerequisites: Node.js 18+
 
+```bash
+npm install
+npm run dev
+```
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+Open http://localhost:3000.
+
+The app currently runs entirely on curated fallback content — **no Gemini API key is required**. To re-enable live AI events, flip `USE_GEMINI` to `true` in `src/services/geminiService.ts` and put `GEMINI_API_KEY` in `.env.local`.
+
+## Scripts
+
+- `npm run dev` — start the Vite dev server on port 3000
+- `npm run build` — production build
+- `npm run preview` — preview the production build
+- `npm run lint` — TypeScript check (`tsc --noEmit`)

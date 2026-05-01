@@ -3,20 +3,56 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
+import type { ReactNode } from 'react';
 import { motion } from 'motion/react';
 import { Country, ActionType } from '../types.ts';
-import { AlertCircle, Heart, Shield, TrendingDown, DollarSign, Target, Handshake, FlaskConical } from 'lucide-react';
+import { ACTION_INFO, type ActionInfo } from '../actions.ts';
+import {
+  AlertCircle,
+  Heart,
+  Shield,
+  TrendingDown,
+  DollarSign,
+  Target,
+  Handshake,
+  FlaskConical,
+  Megaphone,
+  Sword,
+} from 'lucide-react';
 
 interface CountryEntryProps {
   country: Country;
+  player: Country;
   onAction: (action: ActionType) => void;
   key?: string | number;
 }
 
-export function CountryEntry({ country, onAction }: CountryEntryProps) {
+type AffordCheck = { ok: boolean; reason?: string };
+
+export function CountryEntry({ country, player, onAction }: CountryEntryProps) {
   const isPlayer = country.alignment === 'Player-Aligned';
   const isAlly = country.stanceTowardsPlayer === 'Ally';
+
+  const can = (action: ActionType): AffordCheck => {
+    const r = player.resources;
+    switch (action) {
+      case 'Trade': return r.influence >= 10 ? { ok: true } : { ok: false, reason: 'Need 10 INF' };
+      case 'Aid': return r.gdp >= 1.0 ? { ok: true } : { ok: false, reason: 'Need 1.0 GDP' };
+      case 'Intel': return r.influence >= 20 ? { ok: true } : { ok: false, reason: 'Need 20 INF' };
+      case 'Propaganda': return r.influence >= 40 ? { ok: true } : { ok: false, reason: 'Need 40 INF' };
+      case 'Research': return r.gdp >= 2.0 && r.influence >= 10 ? { ok: true } : { ok: false, reason: 'Need 2.0 GDP & 10 INF' };
+      case 'ArmsTrade': return r.science >= 30 ? { ok: true } : { ok: false, reason: 'Need 30 SCI' };
+      case 'Military': return r.militaryPower >= 20 ? { ok: true } : { ok: false, reason: 'Need 20 MIL' };
+      case 'War': return r.militaryPower >= 50 ? { ok: true } : { ok: false, reason: 'Need 50 MIL' };
+      case 'Sanction': return { ok: true };
+      case 'Alliance':
+        if (isAlly) return { ok: true };
+        if (r.influence < 50) return { ok: false, reason: 'Need 50 INF' };
+        if (country.resources.stability < 40) return { ok: false, reason: 'Target STBL < 40' };
+        return { ok: true };
+      default: return { ok: true };
+    }
+  };
 
   const getStanceColor = (stance: string) => {
     switch (stance) {
@@ -31,7 +67,7 @@ export function CountryEntry({ country, onAction }: CountryEntryProps) {
   };
 
   return (
-    <motion.div 
+    <motion.div
       initial={{ opacity: 0, x: -20 }}
       animate={{ opacity: 1, x: 0 }}
       className="flex flex-col p-4 border border-slate-800 bg-slate-900/50 hover:border-slate-700 transition-all rounded-lg"
@@ -47,62 +83,94 @@ export function CountryEntry({ country, onAction }: CountryEntryProps) {
           <p className="text-xs md:text-sm text-slate-400 italic line-clamp-2 md:line-clamp-none leading-relaxed">{country.description}</p>
         </div>
 
-        <div className="grid grid-cols-3 md:flex gap-2 md:gap-6 px-0 md:px-6 py-2 md:py-0 border-y md:border-y-0 border-slate-800/30">
-          <div className="text-center">
-            <div className="text-[9px] uppercase text-slate-500 mb-0.5">GDP</div>
-            <div className={`font-mono font-bold text-xs md:text-sm ${country.resources.gdp > 10 ? 'text-yellow-400' : 'text-white'}`}>${country.resources.gdp}T</div>
-          </div>
-          <div className="text-center">
-            <div className="text-[9px] uppercase text-slate-500 mb-0.5">Stability</div>
-            <div className={`font-mono font-bold text-xs md:text-sm ${country.resources.stability < 50 ? 'text-red-400' : 'text-emerald-400'}`}>{country.resources.stability}%</div>
-          </div>
-          <div className="text-center">
-            <div className="text-[9px] uppercase text-slate-500 mb-0.5">Military</div>
-            <div className="font-mono font-bold text-white text-xs md:text-sm px-2 py-0.5 rounded bg-slate-800">{country.resources.militaryPower}</div>
-          </div>
-          <div className="text-center">
-            <div className="text-[9px] uppercase text-slate-500 mb-0.5">Science</div>
-            <div className="font-mono font-bold text-blue-400 text-xs md:text-sm">{country.resources.science}</div>
-          </div>
+        <div className="grid grid-cols-4 md:flex gap-2 md:gap-6 px-0 md:px-6 py-2 md:py-0 border-y md:border-y-0 border-slate-800/30">
+          <Stat label="GDP" value={`$${country.resources.gdp}T`} accent={country.resources.gdp > 10 ? 'text-yellow-400' : 'text-white'} />
+          <Stat label="Stability" value={`${country.resources.stability}%`} accent={country.resources.stability < 50 ? 'text-red-400' : 'text-emerald-400'} />
+          <Stat label="Military" value={String(country.resources.militaryPower)} accent="text-white" pill />
+          <Stat label="Science" value={String(country.resources.science)} accent="text-blue-400" />
         </div>
       </div>
 
       {!isPlayer && (
-        <div className="flex flex-wrap gap-2 pt-1">
-          <ActionButton onClick={() => onAction('Trade')} icon={<TrendingDown className="rotate-180" size={14} />} label="Trade" color="blue" title="Boost Economy" />
-          <ActionButton onClick={() => onAction('Aid')} icon={<Heart size={14} />} label="Aid" color="emerald" title="Send Humanitarian Support" />
-          <ActionButton onClick={() => onAction('Alliance')} icon={<Handshake size={14} />} label={isAlly ? 'Break' : 'Ally'} color={isAlly ? 'red' : 'blue'} variant={isAlly ? 'ghost' : 'solid'} title="Forge or Break Alliance" />
-          <ActionButton onClick={() => onAction('Intel')} icon={<Target size={14} />} label="Intel" color="orange" title="Intelligence Operation" />
-          <ActionButton onClick={() => onAction('Propaganda')} icon={<Target size={14} className="text-purple-400" />} label="Propaganda" color="purple" title="Inject Fake News" />
-          <ActionButton onClick={() => onAction('Research')} icon={<FlaskConical size={14} />} label="R&D" color="blue" title="Scientific Collaboration" />
-          <ActionButton onClick={() => onAction('ArmsTrade')} icon={<DollarSign size={14} />} label="Sell" color="yellow" title="Sell Advanced Munitions" />
-          <ActionButton onClick={() => onAction('Sanction')} icon={<AlertCircle size={14} />} label="Sanction" color="red" title="Economic Restrictions" />
-          <ActionButton onClick={() => onAction('Military')} icon={<Shield size={14} />} label="Strike" color="red" title="Military Strike" />
-          <ActionButton onClick={() => onAction('War')} icon={<AlertCircle size={14} className="animate-pulse" />} label="Total War" color="red" variant="solid" title="Declare Total War" />
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 pt-1">
+          <ActionButton action="Trade" icon={<TrendingDown className="rotate-180" size={14} />} affordance={can('Trade')} onClick={() => onAction('Trade')} />
+          <ActionButton action="Aid" icon={<Heart size={14} />} affordance={can('Aid')} onClick={() => onAction('Aid')} />
+          <ActionButton action="Alliance" icon={<Handshake size={14} />} affordance={can('Alliance')} onClick={() => onAction('Alliance')} overrideLabel={isAlly ? 'Break Alliance' : undefined} variant={isAlly ? 'aggressive' : undefined} />
+          <ActionButton action="Research" icon={<FlaskConical size={14} />} affordance={can('Research')} onClick={() => onAction('Research')} />
+          <ActionButton action="ArmsTrade" icon={<DollarSign size={14} />} affordance={can('ArmsTrade')} onClick={() => onAction('ArmsTrade')} />
+          <ActionButton action="Intel" icon={<Target size={14} />} affordance={can('Intel')} onClick={() => onAction('Intel')} />
+          <ActionButton action="Propaganda" icon={<Megaphone size={14} />} affordance={can('Propaganda')} onClick={() => onAction('Propaganda')} />
+          <ActionButton action="Sanction" icon={<AlertCircle size={14} />} affordance={can('Sanction')} onClick={() => onAction('Sanction')} />
+          <ActionButton action="Military" icon={<Shield size={14} />} affordance={can('Military')} onClick={() => onAction('Military')} />
+          <ActionButton action="War" icon={<Sword size={14} className="animate-pulse" />} affordance={can('War')} onClick={() => onAction('War')} />
         </div>
       )}
     </motion.div>
   );
 }
 
-function ActionButton({ onClick, icon, label, color, variant = 'ghost', title }: any) {
-  const colors: any = {
-    blue: variant === 'solid' ? 'bg-blue-600 text-white border-blue-600 hover:bg-blue-500' : 'border-blue-500/30 text-blue-400 hover:bg-blue-500/10 hover:border-blue-500/50',
-    emerald: 'border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10 hover:border-emerald-500/50',
-    orange: 'border-orange-500/30 text-orange-400 hover:bg-orange-500/10 hover:border-orange-500/50',
-    purple: 'border-purple-500/30 text-purple-400 hover:bg-purple-500/10 hover:border-purple-500/50',
-    yellow: 'border-yellow-500/30 text-yellow-400 hover:bg-yellow-500/10 hover:border-yellow-500/50',
-    red: variant === 'solid' ? 'bg-red-600 text-white border-red-600 hover:bg-red-500' : 'border-red-500/30 text-red-400 hover:bg-red-500/10 hover:border-red-500/50',
-  };
+function Stat({ label, value, accent, pill }: { label: string; value: string; accent: string; pill?: boolean }) {
+  return (
+    <div className="text-center">
+      <div className="text-[9px] uppercase text-slate-500 mb-0.5">{label}</div>
+      <div className={`font-mono font-bold text-xs md:text-sm ${accent} ${pill ? 'px-2 py-0.5 rounded bg-slate-800 inline-block' : ''}`}>
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function ActionButton({
+  action,
+  icon,
+  onClick,
+  affordance,
+  overrideLabel,
+  variant,
+}: {
+  action: Exclude<ActionType, 'UnlockTech'>;
+  icon: ReactNode;
+  onClick: () => void;
+  affordance: AffordCheck;
+  overrideLabel?: string;
+  variant?: ActionInfo['tone'];
+}) {
+  const info = ACTION_INFO[action];
+  const tone = variant ?? info.tone;
+  const blockedReason = affordance.ok ? null : affordance.reason ?? 'Locked';
+  const disabled = !affordance.ok;
+
+  const toneClass = disabled
+    ? 'border-slate-800 text-slate-600 bg-slate-900/40 cursor-not-allowed'
+    : tone === 'good'
+      ? 'border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/10 hover:border-emerald-400'
+      : tone === 'risky'
+        ? 'border-orange-500/30 text-orange-300 hover:bg-orange-500/10 hover:border-orange-400'
+        : tone === 'aggressive'
+          ? 'border-red-500/40 text-red-300 hover:bg-red-500/10 hover:border-red-400'
+          : 'border-slate-700 text-slate-300 hover:bg-slate-800';
 
   return (
-    <button 
+    <button
       onClick={onClick}
-      title={title}
-      className={`flex items-center gap-2 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider border rounded transition-all flex-grow md:flex-grow-0 justify-center min-w-[80px] ${colors[color]}`}
+      disabled={disabled}
+      title={`${info.label} — ${info.blurb}\nCost: ${info.cost}\nEffect: ${info.effect}${blockedReason ? `\nBlocked: ${blockedReason}` : ''}`}
+      className={`group relative flex flex-col items-start gap-1 px-3 py-2 text-left border rounded-lg transition-all ${toneClass}`}
     >
-      {icon}
-      {label}
+      <div className="flex items-center gap-2 text-[11px] font-black uppercase tracking-wider">
+        {icon}
+        <span>{overrideLabel ?? info.label}</span>
+      </div>
+      <div className="text-[9px] font-mono text-slate-500 leading-tight">
+        <div>cost {info.cost}</div>
+        <div className="opacity-80">→ {info.effect}</div>
+      </div>
+      {blockedReason && (
+        <span className="absolute top-1 right-1 text-[8px] font-bold uppercase text-red-400/80 bg-red-950/40 px-1 rounded">
+          {blockedReason}
+        </span>
+      )}
     </button>
   );
 }
+

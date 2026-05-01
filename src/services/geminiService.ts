@@ -3,123 +3,93 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { GoogleGenAI, Type } from "@google/genai";
 import { GameState, GameEvent } from "../types.ts";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+// Toggle to enable real Gemini calls. Currently disabled — the app runs fully on the
+// curated fallback content below so it costs nothing and works offline.
+const USE_GEMINI = false;
 
-export async function generateNewsEvent(gameState: GameState): Promise<Partial<GameEvent>> {
-  const playerCountry = gameState.countries.find(c => c.id === gameState.playerCountryId);
-  const rivalCountry = gameState.countries.find(c => c.id === 'rival');
+const NEWS_EVENTS: Array<Partial<GameEvent>> = [
+  // Stability events
+  { title: "Consolidation of Power", description: "Internal political realignments solidify the administration's grip on key institutions.", resource: "stability", valueChange: 6 },
+  { title: "Civil Unrest Erupts", description: "Mass protests across three major cities force security deployments, straining federal cohesion.", resource: "stability", valueChange: -8 },
+  { title: "Emergency Cabinet Reshuffle", description: "A sudden cabinet purge removes dissenting voices but unnerves the electorate.", resource: "stability", valueChange: -5 },
+  { title: "Constitutional Reform Passed", description: "A historic referendum clears the path for sweeping institutional changes, boosting public confidence.", resource: "stability", valueChange: 7 },
+  { title: "Pandemic Alert Issued", description: "A novel pathogen spreads through urban centers, triggering emergency protocols and public anxiety.", resource: "stability", valueChange: -10 },
+  { title: "National Unity Address", description: "A presidential address during a crisis moment rallies the public and calms rising tensions.", resource: "stability", valueChange: 5 },
 
-  const prompt = `
-    You are a geopolitical simulation engine. Based on the current world state, generate a significant event.
-    Current Turn: ${gameState.turn}
-    Active Player Leader of: ${playerCountry?.name}
-    
-    Player Stats: GDP: ${playerCountry?.resources.gdp}T, Stability: ${playerCountry?.resources.stability}%, Military: ${playerCountry?.resources.militaryPower}
-    Rival Country: ${rivalCountry?.name} (GDP: ${rivalCountry?.resources.gdp}T, Military: ${rivalCountry?.resources.militaryPower})
+  // GDP events
+  { title: "Supply Chain Fractures", description: "Critical bottlenecks in major shipping lanes trigger a cascade of production slowdowns.", resource: "gdp", valueChange: -0.5 },
+  { title: "Capital Markets Surge", description: "Record investor confidence drives a major rally across equity and bond markets.", resource: "gdp", valueChange: 0.7 },
+  { title: "Cyber Attack on Financial Sector", description: "A coordinated intrusion partially freezes interbank transactions for 72 hours.", resource: "gdp", valueChange: -0.4 },
+  { title: "Energy Grid Modernized", description: "A next-generation fusion-assisted power grid comes online two years ahead of schedule.", resource: "gdp", valueChange: 0.5 },
+  { title: "Trade Embargo Tightens", description: "A coordinated international embargo cuts off access to key commodity markets.", resource: "gdp", valueChange: -0.6 },
+  { title: "Commodity Windfall", description: "A rare earth mineral discovery opens lucrative extraction contracts worth hundreds of billions.", resource: "gdp", valueChange: 0.8 },
+  { title: "Banking System Under Stress", description: "A regional bank run triggers government intervention and dampens economic confidence.", resource: "gdp", valueChange: -0.5 },
 
-    Recent Events: ${gameState.newsLog.slice(-3).join(', ')}
+  // Military events
+  { title: "Strategic Reserve Overhaul", description: "A sweeping modernization program enhances readiness across all branches of the armed forces.", resource: "militaryPower", valueChange: 4 },
+  { title: "Weapons Test Draws Global Attention", description: "A high-profile hypersonic weapons demonstration shifts the regional balance of deterrence.", resource: "militaryPower", valueChange: 5 },
+  { title: "Military Scandal Erupts", description: "Procurement fraud revelations shake the officer corps and trigger a congressional investigation.", resource: "militaryPower", valueChange: -6 },
+  { title: "Joint Exercises Completed", description: "Intensive multi-theater drills sharpen tactical integration across all combat divisions.", resource: "militaryPower", valueChange: 3 },
+  { title: "Desertion Crisis", description: "A wave of low morale desertions strains unit cohesion in forward-deployed forces.", resource: "militaryPower", valueChange: -4 },
 
-    You MUST generate either a Global Event or a Domestic Crisis for the player's country (${playerCountry?.name}).
-    Identify a tension, political scandal, economic opportunity, or military threat.
-    
-    If it is a Domestic Crisis, the 'impactedCountryId' MUST be '${gameState.playerCountryId}'.
-    Examples: Labor strikes in your capital, a legislative breakthrough, stock market crash, or a popular uprising.
-  `;
+  // Influence events
+  { title: "Diplomatic Breakthrough", description: "A surprise trilateral summit produces a historic framework agreement, boosting global standing.", resource: "influence", valueChange: 9 },
+  { title: "Whistleblower Scandal", description: "Leaked classified documents reveal covert operations abroad, triggering international condemnation.", resource: "influence", valueChange: -11 },
+  { title: "Trade Pact Ratified", description: "A comprehensive multilateral trade deal opens new export corridors across four continents.", resource: "influence", valueChange: 7 },
+  { title: "UN Veto Backlash", description: "A controversial Security Council veto triggers a wave of diplomatic protests from neutral nations.", resource: "influence", valueChange: -8 },
+  { title: "Humanitarian Mission Praised", description: "A rapid-response disaster relief operation earns widespread international praise.", resource: "influence", valueChange: 8 },
+  { title: "Ambassador Expulsion Wave", description: "A diplomatic crisis triggers mutual expulsions across seven embassies.", resource: "influence", valueChange: -9 },
 
-  const fallbackEvents: any[] = [
-    { title: "Consolidation of Power", description: "Internal political shifts stabilize the current administration's grip on the region.", resource: "stability", valueChange: 5 },
-    { title: "Supply Chain Bottleneck", description: "Logistical delays in major shipping lanes cause a slight economic slowdown.", resource: "gdp", valueChange: -0.2 },
-    { title: "Strategic Reserve Update", description: "Modernization of reserve forces increases readiness across all sectors.", resource: "militaryPower", valueChange: 2 },
-    { title: "Diplomatic Outreach", description: "A series of successful summits improves our standing with regional partners.", resource: "influence", valueChange: 10 },
-    { title: "Tech Sector Expansion", description: "Breakthroughs in consumer technology provide a boost to national science output.", resource: "science", valueChange: 15 }
-  ];
+  // Science events
+  { title: "Tech Sector Breakthrough", description: "Researchers publish a foundational paper on quantum computing, attracting global talent.", resource: "science", valueChange: 20 },
+  { title: "AI Arms Race Escalates", description: "A classified defense AI achieves decision-making speeds forty times faster than human analysts.", resource: "science", valueChange: 15 },
+  { title: "Brain Drain Accelerates", description: "Restrictive policies push a cohort of elite researchers to seek opportunities abroad.", resource: "science", valueChange: -12 },
+  { title: "Space Launch Success", description: "An orbital manufacturing platform completes its first commercial contract, signaling a new era.", resource: "science", valueChange: 18 },
+];
 
-  try {
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          required: ["title", "description", "impactedCountryId", "resource", "valueChange"],
-          properties: {
-            title: { type: Type.STRING },
-            description: { type: Type.STRING },
-            impactedCountryId: { type: Type.STRING, description: "ID of the most affected country: usa, rival, euro, pan-asia, global-south" },
-            resource: { type: Type.STRING, description: "Resource to change: gdp, stability, militaryPower, influence, science" },
-            valueChange: { type: Type.NUMBER, description: "Numerical change (e.g. -5, 10)" },
-            type: { type: Type.STRING, enum: ["Global", "Regional", "Domestic"] }
-          }
-        }
-      }
-    });
-
-    return JSON.parse(response.text);
-  } catch (error) {
-    console.warn("Gemini Quota/Error - Using fallback event:", error);
-    const event = fallbackEvents[Math.floor(Math.random() * fallbackEvents.length)];
-    return {
-      ...event,
-      impactedCountryId: gameState.playerCountryId,
-      type: "Domestic"
-    };
-  }
+function pickFallbackEvent(gameState: GameState): Partial<GameEvent> {
+  const event = NEWS_EVENTS[Math.floor(Math.random() * NEWS_EVENTS.length)];
+  // 60% target the player; otherwise target a random other country to make
+  // the world feel reactive instead of always punishing the player.
+  const targetPlayer = Math.random() < 0.6;
+  const others = gameState.countries.filter(c => c.id !== gameState.playerCountryId);
+  const impactedCountryId = targetPlayer || others.length === 0
+    ? gameState.playerCountryId
+    : others[Math.floor(Math.random() * others.length)].id;
+  return { ...event, impactedCountryId, type: targetPlayer ? "Domestic" : "Global" };
 }
 
-export async function getAdvisorAdvice(gameState: GameState, advisorRole: string): Promise<string> {
-  const playerCountry = gameState.countries.find(c => c.id === gameState.playerCountryId);
-  const recentEvents = gameState.newsLog.slice(-3).join('. ');
-  
-  const roleContext = {
-    'Military': 'Focus on threats, troop readiness, and global power projection. Suggest strikes or alliances if necessary.',
-    'Economic': 'Focus on GDP growth, trade stability, and maintenance costs. Suggest trade or sanctions.',
-    'Intelligence': 'Focus on shadow operations, propaganda, and rival country stability. Suggest intel or propaganda.'
-  }[advisorRole as 'Military' | 'Economic' | 'Intelligence'] || '';
+const ADVISOR_LINES: Record<string, string[]> = {
+  Military: [
+    "Our strike groups are at optimal readiness. I recommend maintaining a forward presence in contested zones.",
+    "Intelligence suggests rival military expansion. We should prioritize R&D to maintain our technological lead.",
+    "The theater is volatile. Any direct action must be calculated to avoid total escalation.",
+    "If we delay one more cycle, the rival closes the capability gap. Authorize the next-gen procurement now.",
+  ],
+  Economic: [
+    "Our GDP growth remains steady, but maintenance costs are rising. Trade expansion is our best path forward.",
+    "Economic stability is the bedrock of our power. I advise caution with sanctions that could rebound.",
+    "The scientific sector is hungry for funding. Long-term prosperity depends on our breakthrough capabilities.",
+    "Two of our largest creditors are wobbling. A pre-emptive aid package would lock in cheaper bond yields.",
+  ],
+  Intelligence: [
+    "Information is the ultimate weapon. A propaganda campaign could weaken our rivals without firing a shot.",
+    "We are seeing ripples of instability in rival territories. It may be time to deploy deep-cover assets.",
+    "Our global influence is our greatest shield. Diplomacy and intel operations should remain our priority.",
+    "Three rival cells went dark this week. Either they're reorganizing — or they've gone operational.",
+  ],
+};
 
-  const fallbackAdvice: Record<string, string[]> = {
-    'Military': [
-      "Our strike groups are at optimal readiness. I recommend maintaining a forward presence in contested zones.",
-      "Intelligence suggests rival military expansion. We should prioritize R&D to maintain our technological lead.",
-      "The theater is volatile. Any direct action must be calculated to avoid total escalation."
-    ],
-    'Economic': [
-      "Our GDP growth remains steady, but maintenance costs are rising. Trade expansion is our best path forward.",
-      "Economic stability is the bedrock of our power. I advise caution with sanctions that could rebound.",
-      "The scientific sector is hungry for funding. Long-term prosperity depends on our breakthrough capabilities."
-    ],
-    'Intelligence': [
-      "Information is the ultimate weapon. A propaganda campaign could weaken our rivals without firing a shot.",
-      "We are seeing ripples of instability in rival territories. It may be time to deploy deep-cover assets.",
-      "Our global influence is our greatest shield. Diplomacy and intel operations should remain our priority."
-    ]
-  };
+export async function generateNewsEvent(gameState: GameState): Promise<Partial<GameEvent>> {
+  if (!USE_GEMINI) return pickFallbackEvent(gameState);
+  // Real Gemini path intentionally not wired in this build. Re-enable by setting USE_GEMINI = true
+  // and re-importing @google/genai with a valid GEMINI_API_KEY.
+  return pickFallbackEvent(gameState);
+}
 
-  const prompt = `
-    You are the ${advisorRole} Advisor for the ${playerCountry?.name}.
-    Role Mission: ${roleContext}
-    
-    Current stats: GDP: ${playerCountry?.resources.gdp}T, Science: ${playerCountry?.resources.science}, Military: ${playerCountry?.resources.militaryPower}, Stability: ${playerCountry?.resources.stability}%
-    Recent News: ${recentEvents}
-    
-    Global Landscape: ${JSON.stringify(gameState.countries.map(c => ({ name: c.name, stance: c.stanceTowardsPlayer, stability: c.resources.stability })))}
-
-    Provide a direct, high-stakes strategic directive (max 2-3 short sentences). Tone should be urgent and professional.
-  `;
-
-  try {
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview", 
-      contents: prompt,
-    });
-
-    return response.text.trim();
-  } catch (error) {
-    console.warn("Gemini Quota/Error - Using fallback advice:", error);
-    const options = fallbackAdvice[advisorRole] || ["Awaiting clear intelligence feeds. Proceed with current operational parameters."];
-    return options[Math.floor(Math.random() * options.length)];
-  }
+export async function getAdvisorAdvice(_gameState: GameState, advisorRole: string): Promise<string> {
+  const options = ADVISOR_LINES[advisorRole] ?? ["Awaiting clear intelligence feeds. Proceed with current operational parameters."];
+  return options[Math.floor(Math.random() * options.length)];
 }

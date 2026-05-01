@@ -14,13 +14,25 @@ export interface ResourceSet {
 
 export type DiplomaticStance = 'Ally' | 'Friendly' | 'Neutral' | 'Suspicious' | 'Hostile' | 'At War';
 
+export interface Trait {
+  name: string;
+  description: string;
+}
+
+export type Difficulty = 'Easy' | 'Medium' | 'Hard' | 'Extreme';
+
 export interface Country {
   id: string;
   name: string;
+  flag: string;
+  region: string;
   resources: ResourceSet;
   alignment: 'Neutral' | 'Player-Aligned' | 'Rival-Aligned';
   stanceTowardsPlayer: DiplomaticStance;
   description: string;
+  traits: Trait[];
+  difficulty: Difficulty;
+  nuclearArmed: boolean;
 }
 
 export interface GameEvent {
@@ -41,7 +53,7 @@ export interface GameEvent {
 
 export type ActionType = 'Trade' | 'Aid' | 'Intel' | 'Sanction' | 'Military' | 'Alliance' | 'War' | 'Propaganda' | 'Research' | 'ArmsTrade' | 'UnlockTech';
 
-export type TechCategory = 'Military' | 'Economy' | 'Diplomacy';
+export type TechCategory = 'Military' | 'Economy' | 'Diplomacy' | 'Intelligence';
 
 export interface TechNode {
   id: string;
@@ -67,6 +79,78 @@ export interface GameActionRecord {
   message: string;
 }
 
+export type GameOutcome =
+  | { kind: 'Dominance' }
+  | { kind: 'Prosperity' }
+  | { kind: 'Peace' }
+  | { kind: 'Collapse'; reason: string }
+  | { kind: 'Defeated'; reason: string };
+
+export interface HistoryPoint {
+  turn: number;
+  gdp: number;
+  stability: number;
+  militaryPower: number;
+  influence: number;
+  science: number;
+}
+
+export interface AiCountryAction {
+  countryId: string;
+  countryName: string;
+  description: string;
+  hostile: boolean;
+}
+
+export interface TurnRecap {
+  turn: number;
+  eventTitle: string;
+  eventDescription: string;
+  eventResource?: keyof ResourceSet;
+  eventValueChange?: number;
+  eventTargetId?: string;
+  playerBefore: ResourceSet;
+  playerAfter: ResourceSet;
+  aiActions: AiCountryAction[];
+}
+
+export type GameTheoryStrategy =
+  | 'always-defect' | 'grudger' | 'tit-for-tat' | 'tit-for-tat-forgiving'
+  | 'exploiter' | 'win-stay-lose-switch' | 'cooperative' | 'random';
+
+export interface Tweet {
+  id: string;
+  turn: number;
+  countryId: string;
+  leaderName: string;
+  leaderHandle: string;
+  flag: string;
+  content: string;
+  likes: number;
+  retweets: number;
+  tone: 'threat' | 'praise' | 'neutral' | 'intel' | 'warning' | 'event';
+  isClassified?: boolean;
+}
+
+export type StockSector = 'Tech' | 'Energy' | 'Defense' | 'Finance' | 'Auto' | 'Materials' | 'Pharma' | 'Consumer';
+
+export interface Stock {
+  ticker: string;
+  name: string;
+  countryId: string;
+  sector: StockSector;
+  marketCap: number;      // current value, trillions USD
+  baseMarketCap: number;  // starting baseline
+  priceHistory: number[]; // last 12 turns of marketCap
+  changePct: number;      // % change last turn
+}
+
+export interface StockHolding {
+  ticker: string;
+  invested: number;  // GDP invested
+  boughtAt: number;  // marketCap when bought (for P&L calc)
+}
+
 export interface GameState {
   gameStarted: boolean;
   turn: number;
@@ -76,11 +160,12 @@ export interface GameState {
   newsLog: string[];
   actionHistory: GameActionRecord[];
   unlockedTechIds: string[];
-  history: {
-    turn: number;
-    gdp: number;
-    stability: number;
-  }[];
+  history: HistoryPoint[];
+  outcome?: GameOutcome;
+  lastRecap?: TurnRecap;
+  stocks: Stock[];
+  portfolio: StockHolding[];
+  tweetFeed: Tweet[];
 }
 
 export interface Toast {

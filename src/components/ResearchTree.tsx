@@ -2,7 +2,7 @@ import React from 'react';
 import { motion } from 'motion/react';
 import { TechNode, TechCategory } from '../types.ts';
 import { TECH_TREE } from '../constants.ts';
-import { Shield, Wallet, Globe, Lock, CheckCircle, Zap } from 'lucide-react';
+import { Shield, Wallet, Globe, Lock, CheckCircle, Zap, Eye } from 'lucide-react';
 
 interface ResearchTreeProps {
   unlockedTechIds: string[];
@@ -11,21 +11,23 @@ interface ResearchTreeProps {
 }
 
 export function ResearchTree({ unlockedTechIds, currentScience, onUnlock }: ResearchTreeProps) {
-  const categories: TechCategory[] = ['Military', 'Economy', 'Diplomacy'];
+  const categories: TechCategory[] = ['Military', 'Economy', 'Diplomacy', 'Intelligence'];
 
   const getCategoryIcon = (category: TechCategory) => {
     switch (category) {
-      case 'Military': return <Shield size={16} className="text-red-400" />;
-      case 'Economy': return <Wallet size={16} className="text-yellow-400" />;
-      case 'Diplomacy': return <Globe size={16} className="text-blue-400" />;
+      case 'Military':     return <Shield size={16} className="text-red-400" />;
+      case 'Economy':      return <Wallet size={16} className="text-yellow-400" />;
+      case 'Diplomacy':    return <Globe size={16} className="text-blue-400" />;
+      case 'Intelligence': return <Eye size={16} className="text-purple-400" />;
     }
   };
 
   const getCategoryColor = (category: TechCategory) => {
     switch (category) {
-      case 'Military': return 'border-red-500/20 bg-red-950/10';
-      case 'Economy': return 'border-yellow-500/20 bg-yellow-950/10';
-      case 'Diplomacy': return 'border-blue-500/20 bg-blue-950/10';
+      case 'Military':     return 'border-red-500/20 bg-red-950/10';
+      case 'Economy':      return 'border-yellow-500/20 bg-yellow-950/10';
+      case 'Diplomacy':    return 'border-blue-500/20 bg-blue-950/10';
+      case 'Intelligence': return 'border-purple-500/20 bg-purple-950/10';
     }
   };
 
@@ -49,7 +51,7 @@ export function ResearchTree({ unlockedTechIds, currentScience, onUnlock }: Rese
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {categories.map((category) => (
           <div key={category} className="space-y-6">
             <div className={`p-3 rounded-xl border flex items-center gap-3 ${getCategoryColor(category)}`}>
