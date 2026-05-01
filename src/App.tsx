@@ -416,20 +416,20 @@ export default function App() {
       return next;
     });
 
-    // Generate narrative summary for the recap
-    const narrative = generateNarrative(
-      gameState,
-      allAiActions,
-      newsEvent.title ?? '',
-    );
-    setLastNarrative(narrative);
-
-    // Breaking news for major events
+    // Detect breaking news from data already in scope (outside the setState callback)
     const warAction = allAiActions.find(a =>
       a.description.toLowerCase().includes('total war') ||
       a.description.toLowerCase().includes('declares war')
     );
-    const nuclearNews = nuclearBreakingNews.length > 0;
+    // Detect nuclear: any program that crosses 100 this turn
+    const aboutToGoNuclear = (gameState.nuclearPrograms ?? []).find(p => {
+      const advance = NUCLEAR_ADVANCE_PER_TURN[p.countryId] ?? 1;
+      return (p.progress + advance) >= 100 &&
+        !gameState.countries.find(c => c.id === p.countryId)?.nuclearArmed;
+    });
+    const nuclearCountry = aboutToGoNuclear
+      ? updatedCountries.find(c => c.id === aboutToGoNuclear.countryId)
+      : null;
 
     if (warAction) {
       setBreakingNews({
@@ -438,10 +438,10 @@ export default function App() {
         subline: 'Military assets mobilizing. Stock markets in freefall.',
         severity: 'war',
       });
-    } else if (nuclearNews) {
+    } else if (nuclearCountry) {
       setBreakingNews({
         id: `nuclear-${gameState.turn}`,
-        headline: nuclearBreakingNews[0] ?? 'Nuclear test detected.',
+        headline: `☢️ ${nuclearCountry.flag} ${nuclearCountry.name} conducts first nuclear test`,
         subline: 'Global radiation monitors triggered. Security Council convening.',
         severity: 'nuclear',
       });
@@ -453,6 +453,10 @@ export default function App() {
         severity: 'major',
       });
     }
+
+    // Generate narrative summary for the recap
+    const narrative = generateNarrative(gameState, allAiActions, newsEvent.title ?? '');
+    setLastNarrative(narrative);
 
     setIsProcessing(false);
     setRecapOpen(true);

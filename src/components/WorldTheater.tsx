@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { ReactNode } from 'react';
 import { motion } from 'motion/react';
 import { Zap, Shield, TrendingUp, AlertTriangle, ChevronRight } from 'lucide-react';
 import { Country, GameState, ActionType } from '../types.ts';
@@ -67,7 +68,7 @@ function ThreatBar({ player, rival }: { player: Country; rival: Country }) {
   );
 }
 
-type Group = { label: string; icon: React.ReactNode; color: string; bg: string; countries: Country[] };
+type Group = { label: string; icon: ReactNode; color: string; bg: string; countries: Country[] };
 
 function MiniCountryCard({ country, player, onAction, onOpen }: {
   country: Country;
