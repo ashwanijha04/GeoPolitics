@@ -42,6 +42,10 @@ import { generateActionTweets, generateTurnTweets, generateIntelHints } from './
 import { runStrategicAiActions } from './aiStrategy.ts';
 import { generateCrisis, applyCrisisChoice } from './crisisEngine.ts';
 import { CrisisModal } from './components/CrisisModal.tsx';
+import { BreakingNews, BreakingNewsItem } from './components/BreakingNews.tsx';
+import { WorldTheater } from './components/WorldTheater.tsx';
+import { HotDecisions } from './components/HotDecisions.tsx';
+import { generateNarrative } from './narrative.ts';
 
 const INITIAL_STATE: GameState = {
   gameStarted: false,
@@ -82,6 +86,9 @@ export default function App() {
   const [advisorMessage, setAdvisorMessage] = useState<string>('Welcome back, Commander. Awaiting your orders.');
   const [showBriefing, setShowBriefing] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const [breakingNews, setBreakingNews] = useState<BreakingNewsItem | null>(null);
+  const [lastNarrative, setLastNarrative] = useState<string>('');
+  const [expandedCountry, setExpandedCountry] = useState<string | null>(null);
 
   // Persist on every meaningful change.
   useEffect(() => {
@@ -409,9 +416,46 @@ export default function App() {
       return next;
     });
 
+    // Generate narrative summary for the recap
+    const narrative = generateNarrative(
+      gameState,
+      allAiActions,
+      newsEvent.title ?? '',
+    );
+    setLastNarrative(narrative);
+
+    // Breaking news for major events
+    const warAction = allAiActions.find(a =>
+      a.description.toLowerCase().includes('total war') ||
+      a.description.toLowerCase().includes('declares war')
+    );
+    const nuclearNews = nuclearBreakingNews.length > 0;
+
+    if (warAction) {
+      setBreakingNews({
+        id: `war-${gameState.turn}`,
+        headline: `WAR: ${warAction.countryName} — ${warAction.description.slice(0, 80)}`,
+        subline: 'Military assets mobilizing. Stock markets in freefall.',
+        severity: 'war',
+      });
+    } else if (nuclearNews) {
+      setBreakingNews({
+        id: `nuclear-${gameState.turn}`,
+        headline: nuclearBreakingNews[0] ?? 'Nuclear test detected.',
+        subline: 'Global radiation monitors triggered. Security Council convening.',
+        severity: 'nuclear',
+      });
+    } else if ((newsEvent.valueChange ?? 0) <= -8) {
+      setBreakingNews({
+        id: `event-${gameState.turn}`,
+        headline: newsEvent.title ?? 'Major event',
+        subline: newsEvent.description ?? '',
+        severity: 'major',
+      });
+    }
+
     setIsProcessing(false);
     setRecapOpen(true);
-    addToast(`Turn ${gameState.turn + 1}: ${newsEvent.title}`, (newsEvent.valueChange || 0) < 0 ? 'warning' : 'info');
   }, [gameState, playerCountry, addToast]);
 
   const handleCrisisChoice = useCallback((optionId: string) => {
@@ -736,6 +780,7 @@ export default function App() {
         ) : (
           <div key="game" className="flex flex-col h-screen overflow-hidden">
             <ToastContainer toasts={toasts} />
+            <BreakingNews item={breakingNews} onDismiss={() => setBreakingNews(null)} />
             <header className="flex-none bg-slate-900 border-b border-slate-800 z-[60]">
               <div className="flex h-14 md:h-16 items-center px-4 md:px-6">
                 <div className="flex items-center gap-2 md:gap-3 border-r border-slate-700 pr-4 md:pr-6 mr-4 md:mr-6">
@@ -818,29 +863,42 @@ export default function App() {
                       exit={{ opacity: 0, y: -10 }}
                       className="max-w-7xl mx-auto"
                     >
-                      <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 md:mb-8 gap-4">
-                        <div>
-                          <h2 className="text-2xl md:text-3xl font-bold text-white mb-1">Geopolitical Theater</h2>
-                          <p className="text-sm md:text-base text-slate-400">Execute strategic actions on sovereign nations.</p>
-                        </div>
-                        <div className="px-4 py-2 bg-slate-900 border border-slate-700 rounded-lg flex items-center self-start gap-2 text-xs md:text-sm text-slate-300">
-                          <Terminal size={14} className="text-blue-400" />
-                          Feed: <span className="text-emerald-400 font-mono">LIVE_DECRYPTED</span>
-                        </div>
-                      </div>
+                      <div className="grid lg:grid-cols-[minmax(0,1fr)_300px] gap-6">
+                        <div className="space-y-6 min-w-0">
+                          {/* Quick-action theater view */}
+                          <WorldTheater
+                            gameState={gameState}
+                            player={playerCountry!}
+                            onAction={(countryId, action) => performAction(countryId, action)}
+                            onOpenCountry={(id) => setExpandedCountry(expandedCountry === id ? null : id)}
+                          />
 
-                      <div className="grid lg:grid-cols-[minmax(0,1fr)_320px] gap-6">
-                        <div className="grid gap-4 min-w-0">
-                          {gameState.countries.map(country => (
-                            <CountryEntry
-                              key={country.id}
-                              country={country}
-                              player={playerCountry!}
-                              onAction={(action) => performAction(country.id, action as ActionType)}
-                            />
-                          ))}
+                          {/* Expanded detail: full CountryEntry for selected country */}
+                          {expandedCountry && (() => {
+                            const ec = gameState.countries.find(c => c.id === expandedCountry);
+                            return ec ? (
+                              <div className="border-t border-slate-800 pt-4">
+                                <div className="flex items-center justify-between mb-3">
+                                  <span className="text-xs font-black uppercase text-slate-400 tracking-widest">
+                                    {ec.flag} {ec.name} — Full Dossier
+                                  </span>
+                                  <button onClick={() => setExpandedCountry(null)} className="text-slate-500 hover:text-white text-xs">✕ Close</button>
+                                </div>
+                                <CountryEntry
+                                  country={ec}
+                                  player={playerCountry!}
+                                  onAction={(action) => performAction(ec.id, action as ActionType)}
+                                />
+                              </div>
+                            ) : null;
+                          })()}
                         </div>
-                        <div className="lg:sticky lg:top-4 self-start">
+
+                        <div className="lg:sticky lg:top-4 self-start space-y-4">
+                          <HotDecisions
+                            gameState={gameState}
+                            onAction={(countryId, action) => performAction(countryId, action)}
+                          />
                           <SidePanel gameState={gameState} onOpenFeed={() => setActiveTab('feed')} />
                         </div>
                       </div>
@@ -1005,6 +1063,7 @@ export default function App() {
                   recap={gameState.lastRecap}
                   forecast={buildForecast(gameState)}
                   player={playerCountry}
+                  narrative={lastNarrative}
                   onAcknowledge={() => setRecapOpen(false)}
                 />
               )}

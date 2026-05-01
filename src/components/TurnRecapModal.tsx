@@ -4,7 +4,7 @@
  */
 
 import { motion } from 'motion/react';
-import { ArrowDown, ArrowUp, AlertCircle, Globe } from 'lucide-react';
+import { ArrowDown, ArrowUp, AlertCircle, Globe, BookOpen } from 'lucide-react';
 import { Country, TurnRecap } from '../types.ts';
 import { Alert, diffResources, resourceLabel } from '../forecast.ts';
 
@@ -12,10 +12,11 @@ interface Props {
   recap: TurnRecap;
   forecast: Alert[];
   player: Country;
+  narrative?: string;
   onAcknowledge: () => void;
 }
 
-export function TurnRecapModal({ recap, forecast, player, onAcknowledge }: Props) {
+export function TurnRecapModal({ recap, forecast, player, narrative, onAcknowledge }: Props) {
   const deltas = diffResources(recap.playerBefore, recap.playerAfter);
   const eventDelta = recap.eventValueChange ?? 0;
 
@@ -37,6 +38,15 @@ export function TurnRecapModal({ recap, forecast, player, onAcknowledge }: Props
           </div>
           <h2 className="text-2xl md:text-3xl font-black text-white italic tracking-tight mb-3">{recap.eventTitle}</h2>
           <p className="text-slate-300 leading-relaxed text-sm md:text-base">{recap.eventDescription}</p>
+
+          {narrative && (
+            <div className="mt-4 p-3 bg-slate-800/60 rounded-xl border border-slate-700/50">
+              <div className="flex items-center gap-2 mb-1.5 text-[9px] font-black uppercase tracking-widest text-slate-500">
+                <BookOpen size={10} /> Commander's Brief
+              </div>
+              <p className="text-sm text-slate-300 leading-relaxed italic">"{narrative}"</p>
+            </div>
+          )}
 
           {recap.eventResource && (
             <div className="mt-4 p-3 bg-slate-950/60 rounded-xl border border-slate-800 text-xs flex items-center gap-3">
