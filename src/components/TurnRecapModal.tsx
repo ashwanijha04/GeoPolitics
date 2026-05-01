@@ -73,22 +73,48 @@ export function TurnRecapModal({ recap, forecast, player, onAcknowledge }: Props
           )}
         </div>
 
-        {recap.aiActions.length > 0 && (
-          <div className="p-6 md:p-8 border-b border-slate-800">
-            <div className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 mb-3">World Events This Turn</div>
-            <ul className="space-y-2.5">
-              {recap.aiActions.map((action, i) => (
-                <li key={i} className="flex gap-2.5 items-start">
-                  <span className={`mt-1.5 flex-shrink-0 w-1.5 h-1.5 rounded-full ${action.hostile ? 'bg-red-500' : 'bg-emerald-500'}`} />
-                  <span className="text-sm leading-snug text-slate-300">
-                    <span className={`font-bold ${action.hostile ? 'text-red-300' : 'text-emerald-300'}`}>{action.countryName}:</span>{' '}
-                    {action.description}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
+        {recap.aiActions.length > 0 && (() => {
+          const vsPlayer = recap.aiActions.filter(a => !a.isBilateral);
+          const bilateral = recap.aiActions.filter(a => a.isBilateral);
+          return (
+            <>
+              {vsPlayer.length > 0 && (
+                <div className="p-6 md:p-8 border-b border-slate-800">
+                  <div className="text-[10px] font-black uppercase tracking-[0.3em] text-red-400 mb-3">Actions Taken Against You</div>
+                  <ul className="space-y-2.5">
+                    {vsPlayer.map((action, i) => (
+                      <li key={i} className="flex gap-2.5 items-start">
+                        <span className={`mt-1.5 flex-shrink-0 w-1.5 h-1.5 rounded-full ${action.hostile ? 'bg-red-500' : 'bg-emerald-500'}`} />
+                        <span className="text-sm leading-snug text-slate-300">
+                          <span className={`font-bold ${action.hostile ? 'text-red-300' : 'text-emerald-300'}`}>{action.countryName}:</span>{' '}
+                          {action.description}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {bilateral.length > 0 && (
+                <div className="p-6 md:p-8 border-b border-slate-800">
+                  <div className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 mb-3">World Events</div>
+                  <ul className="space-y-2.5">
+                    {bilateral.map((action, i) => (
+                      <li key={i} className="flex gap-2.5 items-start">
+                        <span className="mt-1.5 flex-shrink-0 w-1.5 h-1.5 rounded-full bg-slate-500" />
+                        <span className="text-sm leading-snug text-slate-400">
+                          <span className="font-bold text-slate-300">{action.countryName}</span>
+                          {action.targetCountryName ? <span className="text-slate-600"> → {action.targetCountryName}</span> : null}
+                          {': '}
+                          {action.description}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </>
+          );
+        })()}
 
         {forecast.length > 0 && (
           <div className="p-6 md:p-8 border-b border-slate-800">

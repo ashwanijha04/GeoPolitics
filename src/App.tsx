@@ -39,6 +39,7 @@ import { buildForecast } from './forecast.ts';
 import { runAiCountryActions } from './aiActions.ts';
 import { INITIAL_STOCKS, tickStockMarket } from './stockMarket.ts';
 import { generateActionTweets, generateTurnTweets, generateIntelHints } from './twitterFeed.ts';
+import { runStrategicAiActions } from './aiStrategy.ts';
 
 const INITIAL_STATE: GameState = {
   gameStarted: false,
@@ -235,11 +236,19 @@ export default function App() {
       };
     });
 
-    // AI-controlled countries act
-    const { updatedCountries, actions: aiActions } = runAiCountryActions({
+    // AI-controlled countries act (personality-based, player-facing)
+    const { updatedCountries: afterPersonality, actions: aiActions } = runAiCountryActions({
       ...gameState,
       countries: passiveCountries,
     });
+
+    // AI countries now also make STRATEGIC decisions using the full action engine
+    // (same mechanics as player: strikes, wars, sanctions, trade, alliances)
+    const { updatedCountries, strategicActions } = runStrategicAiActions({
+      ...gameState,
+      countries: afterPersonality,
+    });
+    const allAiActions = [...aiActions, ...strategicActions];
 
     // Tick global stock market
     const { updatedStocks, marketHeadlines, portfolioGdpDelta } = tickStockMarket(
@@ -276,9 +285,9 @@ export default function App() {
         eventTargetId: newsEvent.impactedCountryId,
         playerBefore,
         playerAfter: { ...player.resources },
-        aiActions,
+        aiActions: allAiActions,
       };
-      const aiNewsLines = aiActions.filter(a => a.hostile).map(a => `${a.countryName}: ${a.description}`);
+      const aiNewsLines = allAiActions.filter(a => a.hostile).map(a => `${a.countryName}: ${a.description}`);
 
       // Generate world leader tweets and classified intel hints for this turn
       // ── Nuclear program advancement ──────────────────────────────────────
@@ -335,10 +344,11 @@ export default function App() {
 
       const turnTweets = generateTurnTweets(
         { ...prev, countries: updatedCountries },
-        aiActions.map(a => a.description),
+        allAiActions.map(a => a.description),
       );
       const intelTweets = generateIntelHints({ ...prev, countries: updatedCountries });
-      const allNewTweets = [...intelTweets, ...turnTweets]; // intel first (top of feed)
+      // Newest at front so feed shows most recent first
+      const allNewTweets = [...intelTweets, ...turnTweets];
 
       const nuclearBreakingNews = newlyNuclear.map(id => {
         const c = updatedCountries.find(x => x.id === id);
@@ -771,7 +781,7 @@ export default function App() {
                           ))}
                         </div>
                         <div className="lg:sticky lg:top-4 self-start">
-                          <SidePanel gameState={gameState} />
+                          <SidePanel gameState={gameState} onOpenFeed={() => setActiveTab('feed')} />
                         </div>
                       </div>
                     </motion.div>

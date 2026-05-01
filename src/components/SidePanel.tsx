@@ -11,6 +11,7 @@ import { SPACE_MILESTONES, SPACE_MILESTONE_ORDER } from '../constants.ts';
 
 interface Props {
   gameState: GameState;
+  onOpenFeed: () => void;
 }
 
 const ADVISORS = [
@@ -19,11 +20,12 @@ const ADVISORS = [
   { role: 'Intelligence' as const, icon: Target, accent: 'text-purple-400', ring: 'border-purple-500/30' },
 ];
 
-export function SidePanel({ gameState }: Props) {
+export function SidePanel({ gameState, onOpenFeed }: Props) {
   const alerts = buildForecast(gameState);
 
   return (
     <div className="space-y-4">
+      <LiveFeedPreview gameState={gameState} onOpenFeed={onOpenFeed} />
       <ForecastCard alerts={alerts} />
       <SpaceRaceCard gameState={gameState} />
       <NuclearCard gameState={gameState} />
@@ -87,6 +89,68 @@ function ForecastCard({ alerts }: { alerts: Alert[] }) {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+const TONE_DOT: Record<string, string> = {
+  threat:  'bg-red-500',
+  warning: 'bg-amber-400',
+  praise:  'bg-emerald-500',
+  event:   'bg-blue-400',
+  intel:   'bg-purple-500',
+  neutral: 'bg-slate-500',
+};
+
+function LiveFeedPreview({ gameState, onOpenFeed }: { gameState: GameState; onOpenFeed: () => void }) {
+  const feed = gameState.tweetFeed ?? [];
+  // Newest 3
+  const latest = [...feed].reverse().slice(0, 3);
+  if (latest.length === 0) return null;
+
+  return (
+    <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-4">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <div className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
+          <span className="text-[10px] font-black uppercase tracking-[0.3em] text-blue-400">Live Feed</span>
+        </div>
+        <button
+          onClick={onOpenFeed}
+          className="text-[9px] font-bold text-slate-500 hover:text-blue-400 uppercase tracking-wider transition-colors"
+        >
+          View all →
+        </button>
+      </div>
+      <div className="space-y-2.5">
+        {latest.map(tw => {
+          const country = gameState.countries.find(c => c.id === tw.countryId);
+          const flag = country?.flag ?? '🌐';
+          return (
+            <motion.div
+              key={tw.id}
+              initial={{ opacity: 0, x: -4 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="flex gap-2 items-start"
+            >
+              <div className="relative flex-shrink-0 mt-0.5">
+                <span className="text-sm">{tw.isClassified ? '🔒' : flag}</span>
+                <span className={`absolute -bottom-0.5 -right-0.5 w-1.5 h-1.5 rounded-full ${TONE_DOT[tw.tone] ?? 'bg-slate-500'}`} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-[9px] font-black text-slate-400 truncate">{tw.isClassified ? 'CLASSIFIED INTEL' : tw.leaderHandle}</div>
+                <div className="text-[10px] text-slate-300 leading-snug line-clamp-2">{tw.content}</div>
+              </div>
+            </motion.div>
+          );
+        })}
+      </div>
+      <button
+        onClick={onOpenFeed}
+        className="mt-3 w-full py-2 text-[10px] font-black uppercase tracking-widest border border-slate-700 rounded-xl text-slate-400 hover:border-blue-500 hover:text-blue-400 transition-all"
+      >
+        Open Intelligence Feed
+      </button>
     </div>
   );
 }
