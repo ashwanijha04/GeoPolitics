@@ -399,8 +399,12 @@ export default function App() {
         spaceAchievements: newAchievements,
         regionalConflicts: prev.regionalConflicts ?? INITIAL_REGIONAL_CONFLICTS,
         worldTension: calcWorldTension(prev.worldTension ?? 45, allAiActions),
-        activeCrisis: !prev.activeCrisis ? (generateCrisis({ ...next }) ?? undefined) : prev.activeCrisis,
       };
+      // Assign activeCrisis AFTER next is built — generateCrisis reads next's full state
+      if (!prev.activeCrisis) {
+        const crisis = generateCrisis(next);
+        if (crisis) next.activeCrisis = crisis;
+      }
       next.outcome = evaluateOutcome(next) ?? undefined;
       return next;
     });
