@@ -7,7 +7,7 @@
  * These are the "chess forks" — no perfect answer, only trade-offs.
  */
 
-import { GameState, ActiveCrisis } from './types.ts';
+import { GameState, ActiveCrisis, DiplomaticStance } from './types.ts';
 
 function clamp(v: number, lo: number, hi: number) { return Math.max(lo, Math.min(hi, v)); }
 
@@ -360,7 +360,7 @@ export function applyCrisisChoice(
       let downgraded = 0;
       for (let i = 0; i < countries.length && downgraded < 3; i++) {
         if (countries[i].stanceTowardsPlayer === 'Ally' || countries[i].stanceTowardsPlayer === 'Friendly') {
-          const stances: import('./types.ts').DiplomaticStance[] = ['Ally', 'Friendly', 'Neutral', 'Suspicious', 'Hostile', 'At War'];
+          const stances: DiplomaticStance[] = ['Ally', 'Friendly', 'Neutral', 'Suspicious', 'Hostile', 'At War'];
           const idx2 = stances.indexOf(countries[i].stanceTowardsPlayer);
           countries[i] = { ...countries[i], stanceTowardsPlayer: stances[Math.min(stances.length - 1, idx2 + 1)] };
           downgraded++;

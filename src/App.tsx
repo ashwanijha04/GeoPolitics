@@ -32,7 +32,7 @@ import { TurnRecapModal } from './components/TurnRecapModal.tsx';
 import { StockMarket } from './components/StockMarket.tsx';
 import { TwitterFeed } from './components/TwitterFeed.tsx';
 import { INITIAL_COUNTRIES, TECH_TREE, COUNTRY_PASSIVE_MODIFIERS, RIVAL_COUNTRIES, getInitialStance, INITIAL_NUCLEAR_PROGRAMS, NUCLEAR_ADVANCE_PER_TURN, SPACE_MILESTONES, SPACE_MILESTONE_ORDER, INITIAL_REGIONAL_CONFLICTS } from './constants.ts';
-import { GameState, Country, ResourceSet, ActionType, Toast, HistoryPoint, TurnRecap, Stock, StockHolding, SpaceMilestone } from './types.ts';
+import { GameState, Country, ResourceSet, ActionType, Toast, HistoryPoint, TurnRecap, Stock, StockHolding, SpaceMilestone, Tweet, AiCountryAction } from './types.ts';
 import { generateNewsEvent, getAdvisorAdvice } from './services/geminiService.ts';
 import { clearSavedGame, evaluateOutcome, loadGameState, saveGameState } from './gameLogic.ts';
 import { buildForecast } from './forecast.ts';
@@ -361,7 +361,7 @@ export default function App() {
           const country = updatedCountries.find(c => c.id === action.countryId);
           const flag = country?.flag ?? '🌐';
           const leader = { name: action.countryName, handle: `@${action.countryId}` };
-          const tone: import('./types.ts').Tweet['tone'] = action.hostile ? 'threat' : action.isBilateral ? 'neutral' : 'praise';
+          const tone: Tweet['tone'] = action.hostile ? 'threat' : action.isBilateral ? 'neutral' : 'praise';
           return {
             id: `ai_${action.countryId}_${newTurn}_${Math.random().toString(36).slice(2,6)}`,
             turn: newTurn,
@@ -374,7 +374,7 @@ export default function App() {
             retweets: Math.floor(Math.random() * 12000) + 100,
             tone,
             isClassified: false,
-          } as import('./types.ts').Tweet;
+          } as Tweet;
         });
 
       // Newest at front so feed shows most recent first
@@ -440,7 +440,7 @@ export default function App() {
           : c
       );
       const existingIdx = (prev.portfolio ?? []).findIndex(h => h.ticker === ticker);
-      let newPortfolio: import('./types.ts').StockHolding[];
+      let newPortfolio: StockHolding[];
       if (existingIdx >= 0) {
         newPortfolio = prev.portfolio.map((h, i) =>
           i === existingIdx
@@ -1032,7 +1032,7 @@ export default function App() {
   );
 }
 
-function calcWorldTension(current: number, actions: import('./types.ts').AiCountryAction[]): number {
+function calcWorldTension(current: number, actions: AiCountryAction[]): number {
   let delta = 0;
   for (const a of actions) {
     if (a.description.toLowerCase().includes('war') || a.description.toLowerCase().includes('offensive')) delta += 8;
