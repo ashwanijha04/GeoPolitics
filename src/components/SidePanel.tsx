@@ -27,6 +27,8 @@ export function SidePanel({ gameState, onOpenFeed }: Props) {
     <div className="space-y-4">
       <LiveFeedPreview gameState={gameState} onOpenFeed={onOpenFeed} />
       <ForecastCard alerts={alerts} />
+      <WorldTensionCard gameState={gameState} />
+      <VictoryProgressCard gameState={gameState} />
       <SpaceRaceCard gameState={gameState} />
       <NuclearCard gameState={gameState} />
       <ConflictsCard gameState={gameState} />
@@ -101,6 +103,98 @@ const TONE_DOT: Record<string, string> = {
   intel:   'bg-purple-500',
   neutral: 'bg-slate-500',
 };
+
+function WorldTensionCard({ gameState }: { gameState: GameState }) {
+  const tension = gameState.worldTension ?? 0;
+  const color = tension >= 75 ? 'bg-red-500' : tension >= 50 ? 'bg-amber-400' : tension >= 30 ? 'bg-yellow-400' : 'bg-emerald-500';
+  const label = tension >= 85 ? 'CRITICAL — WAR IMMINENT' : tension >= 70 ? 'VOLATILE — CRISIS ZONE' : tension >= 50 ? 'ELEVATED TENSIONS' : tension >= 30 ? 'UNEASY STABILITY' : 'RELATIVE CALM';
+  const textColor = tension >= 75 ? 'text-red-400' : tension >= 50 ? 'text-amber-400' : 'text-emerald-400';
+  return (
+    <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-4">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">⚡ World Tension</span>
+        <span className={`text-sm font-black ${textColor}`}>{tension}</span>
+      </div>
+      <div className="h-2 bg-slate-800 rounded-full overflow-hidden mb-2">
+        <motion.div
+          className={`h-full ${color} rounded-full`}
+          initial={{ width: 0 }}
+          animate={{ width: `${tension}%` }}
+          transition={{ duration: 0.6 }}
+        />
+      </div>
+      <div className={`text-[9px] font-black uppercase tracking-wider ${textColor}`}>{label}</div>
+      {tension >= 75 && (
+        <div className="mt-2 text-[9px] text-red-400 italic">Crisis events more likely. Diplomatic action reduces tension.</div>
+      )}
+    </div>
+  );
+}
+
+function VictoryProgressCard({ gameState }: { gameState: GameState }) {
+  const player = gameState.countries.find(c => c.id === gameState.playerCountryId);
+  if (!player) return null;
+  const others = gameState.countries.filter(c => c.id !== gameState.playerCountryId);
+  const topMil = others.length > 0 ? Math.max(...others.map(c => c.resources.militaryPower)) : 0;
+  const topGdp = others.length > 0 ? Math.max(...others.map(c => c.resources.gdp)) : 0;
+
+  const paths = [
+    {
+      name: 'Dominance',
+      icon: '⚔️',
+      progress: Math.min(100, Math.round(
+        ((player.resources.militaryPower - topMil + 25) / 50 * 50) +
+        ((player.resources.gdp - topGdp + 5) / 10 * 50)
+      )),
+      hint: `Need +25 MIL & +5 GDP over rivals. MIL gap: ${(player.resources.militaryPower - topMil).toFixed(0)}, GDP gap: $${(player.resources.gdp - topGdp).toFixed(1)}T`,
+      color: 'bg-red-500',
+    },
+    {
+      name: 'Prosperity',
+      icon: '💰',
+      progress: Math.min(100, Math.round(
+        (player.resources.gdp / 50 * 60) +
+        (player.resources.stability / 85 * 40)
+      )),
+      hint: `Need $50T GDP + 85% stability. At $${player.resources.gdp.toFixed(1)}T & ${player.resources.stability}%.`,
+      color: 'bg-yellow-400',
+    },
+    {
+      name: 'Peace',
+      icon: '🕊',
+      progress: Math.min(100, Math.round(
+        (others.filter(c => c.stanceTowardsPlayer === 'Ally' || c.stanceTowardsPlayer === 'Friendly').length / others.length * 70) +
+        (player.resources.influence / 90 * 30)
+      )),
+      hint: `Need all nations Friendly/Ally + 90 INF. ${others.filter(c => c.stanceTowardsPlayer === 'Ally' || c.stanceTowardsPlayer === 'Friendly').length}/${others.length} nations friendly.`,
+      color: 'bg-emerald-500',
+    },
+  ];
+
+  return (
+    <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-4">
+      <div className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 mb-3">Victory Progress</div>
+      <div className="space-y-3">
+        {paths.map(p => (
+          <div key={p.name} title={p.hint}>
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[10px] font-bold text-slate-300">{p.icon} {p.name}</span>
+              <span className={`text-[10px] font-black ${p.progress >= 80 ? 'text-emerald-400' : 'text-slate-400'}`}>{p.progress}%</span>
+            </div>
+            <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
+              <motion.div
+                className={`h-full ${p.color} rounded-full`}
+                initial={{ width: 0 }}
+                animate={{ width: `${Math.max(0, p.progress)}%` }}
+                transition={{ duration: 0.5 }}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 function LiveFeedPreview({ gameState, onOpenFeed }: { gameState: GameState; onOpenFeed: () => void }) {
   const feed = gameState.tweetFeed ?? [];

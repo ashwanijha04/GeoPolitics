@@ -126,6 +126,23 @@ export interface RegionalConflict {
   intensity: number;  // 0–100; higher = worse drain each turn
 }
 
+export interface CrisisOption {
+  id: string;
+  label: string;
+  description: string;
+  consequence: string;
+}
+
+export interface ActiveCrisis {
+  id: string;
+  turn: number;
+  title: string;
+  description: string;
+  urgency: 'critical' | 'high' | 'medium';
+  options: CrisisOption[];
+  relatedCountryId?: string;
+}
+
 export interface TurnRecap {
   turn: number;
   eventTitle: string;
@@ -193,6 +210,8 @@ export interface GameState {
   nuclearPrograms: NuclearProgram[];
   spaceAchievements: SpaceAchievement[];
   regionalConflicts: RegionalConflict[];
+  worldTension: number;       // 0–100; rises with conflict, falls with diplomacy
+  activeCrisis?: ActiveCrisis;
 }
 
 export interface Toast {

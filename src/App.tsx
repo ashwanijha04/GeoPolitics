@@ -40,6 +40,8 @@ import { runAiCountryActions } from './aiActions.ts';
 import { INITIAL_STOCKS, tickStockMarket } from './stockMarket.ts';
 import { generateActionTweets, generateTurnTweets, generateIntelHints } from './twitterFeed.ts';
 import { runStrategicAiActions } from './aiStrategy.ts';
+import { generateCrisis, applyCrisisChoice } from './crisisEngine.ts';
+import { CrisisModal } from './components/CrisisModal.tsx';
 
 const INITIAL_STATE: GameState = {
   gameStarted: false,
@@ -57,6 +59,8 @@ const INITIAL_STATE: GameState = {
   nuclearPrograms: INITIAL_NUCLEAR_PROGRAMS.map(p => ({ ...p })),
   spaceAchievements: [],
   regionalConflicts: INITIAL_REGIONAL_CONFLICTS.map(c => ({ ...c })),
+  worldTension: 45,
+  activeCrisis: undefined,
 };
 
 function snapshot(country: Country, turn: number): HistoryPoint {
@@ -125,6 +129,8 @@ export default function App() {
       nuclearPrograms: INITIAL_NUCLEAR_PROGRAMS.map(p => ({ ...p })),
       spaceAchievements: [],
       regionalConflicts: INITIAL_REGIONAL_CONFLICTS.map(c => ({ ...c })),
+      worldTension: 45,
+      activeCrisis: undefined,
     });
     setShowBriefing(true);
   };
@@ -347,8 +353,32 @@ export default function App() {
         allAiActions.map(a => a.description),
       );
       const intelTweets = generateIntelHints({ ...prev, countries: updatedCountries });
+      // Generate tweets for bilateral + strategic AI actions
+      const aiActionTweets = allAiActions
+        .filter(a => Math.random() < 0.55) // not every action needs a tweet
+        .slice(0, 4)
+        .map(action => {
+          const country = updatedCountries.find(c => c.id === action.countryId);
+          const flag = country?.flag ?? '🌐';
+          const leader = { name: action.countryName, handle: `@${action.countryId}` };
+          const tone: import('./types.ts').Tweet['tone'] = action.hostile ? 'threat' : action.isBilateral ? 'neutral' : 'praise';
+          return {
+            id: `ai_${action.countryId}_${newTurn}_${Math.random().toString(36).slice(2,6)}`,
+            turn: newTurn,
+            countryId: action.countryId,
+            leaderName: leader.name,
+            leaderHandle: leader.handle,
+            flag,
+            content: action.description,
+            likes: Math.floor(Math.random() * 40000) + 500,
+            retweets: Math.floor(Math.random() * 12000) + 100,
+            tone,
+            isClassified: false,
+          } as import('./types.ts').Tweet;
+        });
+
       // Newest at front so feed shows most recent first
-      const allNewTweets = [...intelTweets, ...turnTweets];
+      const allNewTweets = [...intelTweets, ...turnTweets, ...aiActionTweets];
 
       const nuclearBreakingNews = newlyNuclear.map(id => {
         const c = updatedCountries.find(x => x.id === id);
@@ -368,6 +398,8 @@ export default function App() {
         nuclearPrograms: updatedNuclearPrograms,
         spaceAchievements: newAchievements,
         regionalConflicts: prev.regionalConflicts ?? INITIAL_REGIONAL_CONFLICTS,
+        worldTension: calcWorldTension(prev.worldTension ?? 45, allAiActions),
+        activeCrisis: !prev.activeCrisis ? (generateCrisis({ ...next }) ?? undefined) : prev.activeCrisis,
       };
       next.outcome = evaluateOutcome(next) ?? undefined;
       return next;
@@ -377,6 +409,21 @@ export default function App() {
     setRecapOpen(true);
     addToast(`Turn ${gameState.turn + 1}: ${newsEvent.title}`, (newsEvent.valueChange || 0) < 0 ? 'warning' : 'info');
   }, [gameState, playerCountry, addToast]);
+
+  const handleCrisisChoice = useCallback((optionId: string) => {
+    setGameState(prev => {
+      if (!prev.activeCrisis) return prev;
+      const { updatedState, resultMessage } = applyCrisisChoice(prev, prev.activeCrisis.id, optionId);
+      const next = {
+        ...prev,
+        ...updatedState,
+        newsLog: [...prev.newsLog, resultMessage].filter(Boolean),
+      } as GameState;
+      next.outcome = evaluateOutcome(next) ?? undefined;
+      return next;
+    });
+    addToast('Decision executed. Consequences now in play.', 'info');
+  }, [addToast]);
 
   const buyStock = useCallback((ticker: string, amount: number) => {
     setGameState(prev => {
@@ -704,6 +751,15 @@ export default function App() {
                 </div>
 
                 <div className="flex-1 flex items-center overflow-x-auto no-scrollbar gap-1">
+                  {/* World Tension pill */}
+                  <div className={`flex-shrink-0 flex items-center gap-1 px-2 py-1 rounded-lg border text-[10px] font-black uppercase ${
+                    (gameState.worldTension ?? 0) >= 75 ? 'border-red-500/40 bg-red-950/20 text-red-400' :
+                    (gameState.worldTension ?? 0) >= 50 ? 'border-amber-500/30 bg-amber-950/20 text-amber-400' :
+                    'border-slate-700 bg-slate-900 text-slate-400'
+                  }`} title="World Tension">
+                    <span>⚡</span>
+                    <span className="hidden md:inline">{gameState.worldTension ?? 0}</span>
+                  </div>
                   <ResourceCounter label="GDP" value={playerCountry!.resources.gdp} suffix="T" icon="gdp" color="text-yellow-400" description="Gross Domestic Product. Earned through trade, alliances, and time." />
                   <ResourceCounter label="STBL" value={playerCountry!.resources.stability} suffix="%" icon="stability" color="text-emerald-400" description="National Stability. Impacted by events, war, and aid." />
                   <ResourceCounter label="MIL" value={playerCountry!.resources.militaryPower} suffix="" icon="military" color="text-red-500" description="Military Strength. Built through R&D and spending. Consumed by war." />
@@ -960,11 +1016,32 @@ export default function App() {
                 />
               )}
             </AnimatePresence>
+
+            <AnimatePresence>
+              {gameState.activeCrisis && !gameState.outcome && !recapOpen && (
+                <CrisisModal
+                  crisis={gameState.activeCrisis}
+                  onChoose={handleCrisisChoice}
+                />
+              )}
+            </AnimatePresence>
           </div>
         )}
       </AnimatePresence>
     </div>
   );
+}
+
+function calcWorldTension(current: number, actions: import('./types.ts').AiCountryAction[]): number {
+  let delta = 0;
+  for (const a of actions) {
+    if (a.description.toLowerCase().includes('war') || a.description.toLowerCase().includes('offensive')) delta += 8;
+    else if (a.description.toLowerCase().includes('strike') || a.description.toLowerCase().includes('missile') || a.description.toLowerCase().includes('attack')) delta += 5;
+    else if (a.description.toLowerCase().includes('sanction')) delta += 2;
+    else if (a.description.toLowerCase().includes('alliance') || a.description.toLowerCase().includes('trade') || a.description.toLowerCase().includes('aid')) delta -= 1;
+    else if (a.description.toLowerCase().includes('ceasefire') || a.description.toLowerCase().includes('de-escalat')) delta -= 4;
+  }
+  return Math.max(0, Math.min(100, current + delta));
 }
 
 const DIFFICULTY_STYLE = {
