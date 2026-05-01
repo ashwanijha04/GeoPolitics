@@ -51,7 +51,7 @@ export interface GameEvent {
   type: 'Global' | 'Regional' | 'Domestic';
 }
 
-export type ActionType = 'Trade' | 'Aid' | 'Intel' | 'Sanction' | 'Military' | 'Alliance' | 'War' | 'Propaganda' | 'Research' | 'ArmsTrade' | 'UnlockTech';
+export type ActionType = 'Trade' | 'Aid' | 'Intel' | 'Sanction' | 'Military' | 'Alliance' | 'War' | 'Propaganda' | 'Research' | 'ArmsTrade' | 'UnlockTech' | 'UN';
 
 export type TechCategory = 'Military' | 'Economy' | 'Diplomacy' | 'Intelligence';
 
@@ -100,6 +100,30 @@ export interface AiCountryAction {
   countryName: string;
   description: string;
   hostile: boolean;
+  targetCountryId?: string;   // set when two non-player countries clash
+  targetCountryName?: string;
+  isBilateral?: boolean;      // country-vs-country, not vs player
+}
+
+export interface NuclearProgram {
+  countryId: string;
+  progress: number;     // 0–100; hits 100 = goes nuclear
+  detected: boolean;    // revealed by Intel Op
+}
+
+export type SpaceMilestone = 'satellite' | 'moon' | 'station' | 'mars';
+export interface SpaceAchievement {
+  countryId: string;
+  milestone: SpaceMilestone;
+  turn: number;
+}
+
+export interface RegionalConflict {
+  id: string;
+  countryAId: string;
+  countryBId: string;
+  name: string;
+  intensity: number;  // 0–100; higher = worse drain each turn
 }
 
 export interface TurnRecap {
@@ -166,6 +190,9 @@ export interface GameState {
   stocks: Stock[];
   portfolio: StockHolding[];
   tweetFeed: Tweet[];
+  nuclearPrograms: NuclearProgram[];
+  spaceAchievements: SpaceAchievement[];
+  regionalConflicts: RegionalConflict[];
 }
 
 export interface Toast {

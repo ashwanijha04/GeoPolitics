@@ -233,29 +233,26 @@ export function TwitterFeed({ gameState }: Props) {
               {gameState.countries
                 .filter(c => c.id !== gameState.playerCountryId)
                 .map(c => {
-                  const leader = LEADERS[c.id];
-                  if (!leader) return null;
-                  const stratColor = {
-                    'always-defect': 'text-red-500',
-                    'grudger': 'text-orange-400',
-                    'tit-for-tat': 'text-yellow-400',
-                    'tit-for-tat-forgiving': 'text-emerald-400',
-                    'exploiter': 'text-amber-400',
-                    'win-stay-lose-switch': 'text-blue-400',
-                    'cooperative': 'text-teal-400',
-                    'random': 'text-purple-400',
-                  }[leader.strategy] ?? 'text-slate-400';
+                  const nucProg = gameState.nuclearPrograms?.find(n => n.countryId === c.id);
+                  const spaceAch = gameState.spaceAchievements?.filter(a => a.countryId === c.id).length ?? 0;
                   return (
                     <div key={c.id} className="flex items-center gap-2 p-1.5 rounded-lg hover:bg-slate-800/40 transition-colors">
                       <span className="text-base">{c.flag}</span>
                       <div className="flex-1 min-w-0">
-                        <div className="text-[10px] font-bold text-slate-300 truncate">{c.name}</div>
-                        <div className={`text-[9px] font-black uppercase truncate ${stratColor}`}>{leader.strategy}</div>
+                        <div className="flex items-center gap-1">
+                          <span className="text-[10px] font-bold text-slate-300 truncate">{c.name}</span>
+                          {c.nuclearArmed && <span className="text-[8px] text-amber-400">☢</span>}
+                          {spaceAch > 0 && <span className="text-[8px] text-blue-400">🚀</span>}
+                        </div>
+                        {nucProg && nucProg.detected && !c.nuclearArmed && (
+                          <div className="text-[8px] text-purple-400 font-bold">☢ COVERT {nucProg.progress.toFixed(0)}%</div>
+                        )}
                       </div>
                       <div className={`text-[8px] px-1.5 py-0.5 rounded border font-bold uppercase ${
                         c.stanceTowardsPlayer === 'Ally' ? 'border-blue-500/30 text-blue-400' :
                         c.stanceTowardsPlayer === 'Friendly' ? 'border-emerald-500/30 text-emerald-400' :
                         c.stanceTowardsPlayer === 'Hostile' || c.stanceTowardsPlayer === 'At War' ? 'border-red-500/30 text-red-400' :
+                        c.stanceTowardsPlayer === 'Suspicious' ? 'border-orange-500/30 text-orange-400' :
                         'border-slate-700 text-slate-500'
                       }`}>{c.stanceTowardsPlayer}</div>
                     </div>

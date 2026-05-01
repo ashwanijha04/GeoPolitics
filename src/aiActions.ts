@@ -82,7 +82,119 @@ export function runAiCountryActions(state: GameState): { updatedCountries: Count
     }
   }
 
+  // ── Bilateral: countries act against EACH OTHER, independent of player ──────
+  processBilateralActions(countries, state, actions);
+
   return { updatedCountries: countries, actions };
+}
+
+// ─── Bilateral (country-vs-country) actions ───────────────────────────────────
+// Each conflict pair has a chance to produce an incident every turn.
+function processBilateralActions(countries: Country[], state: GameState, actions: AiCountryAction[]) {
+  function find(id: string) { return countries.findIndex(c => c.id === id); }
+  function clamp(v: number, lo: number, hi: number) { return Math.max(lo, Math.min(hi, v)); }
+
+  // ── Russia → Ukraine (war) ────────────────────────────────────────────────
+  const riIdx = find('russia'), ukIdx = find('ukraine');
+  if (riIdx !== -1 && ukIdx !== -1 && Math.random() < 0.75) {
+    const roll = Math.random();
+    if (roll < 0.5) {
+      countries[ukIdx].resources.stability = clamp(countries[ukIdx].resources.stability - 7, 0, 100);
+      countries[ukIdx].resources.militaryPower = clamp(countries[ukIdx].resources.militaryPower - 5, 0, 200);
+      countries[ukIdx].resources.gdp = Math.max(0.01, Number((countries[ukIdx].resources.gdp - 0.08).toFixed(2)));
+      actions.push({ countryId: 'russia', countryName: 'Russia', targetCountryId: 'ukraine', targetCountryName: 'Ukraine', description: 'Launches renewed offensive operations in eastern Ukraine. Civilian infrastructure targeted.', hostile: false, isBilateral: true });
+    } else {
+      countries[ukIdx].resources.stability = clamp(countries[ukIdx].resources.stability - 4, 0, 100);
+      countries[riIdx].resources.militaryPower = clamp(countries[riIdx].resources.militaryPower - 3, 0, 200);
+      actions.push({ countryId: 'ukraine', countryName: 'Ukraine', targetCountryId: 'russia', targetCountryName: 'Russia', description: 'Conducts long-range drone strikes deep inside Russian territory. Moscow reports fires at oil depots.', hostile: false, isBilateral: true });
+    }
+  }
+
+  // ── China → Taiwan (coercion) ─────────────────────────────────────────────
+  const chIdx = find('china'), twIdx = find('taiwan');
+  if (chIdx !== -1 && twIdx !== -1 && Math.random() < 0.55) {
+    const roll = Math.random();
+    if (roll < 0.45) {
+      countries[twIdx].resources.stability = clamp(countries[twIdx].resources.stability - 5, 0, 100);
+      actions.push({ countryId: 'china', countryName: 'China', targetCountryId: 'taiwan', targetCountryName: 'Taiwan', description: 'Conducts large-scale military exercises in the Taiwan Strait. 40 warplanes breach median line.', hostile: false, isBilateral: true });
+    } else if (roll < 0.75) {
+      countries[twIdx].resources.gdp = Math.max(0.01, Number((countries[twIdx].resources.gdp * 0.97).toFixed(2)));
+      actions.push({ countryId: 'china', countryName: 'China', targetCountryId: 'taiwan', targetCountryName: 'Taiwan', description: 'Expands trade restrictions on Taiwanese goods. Economic coercion campaign intensifies.', hostile: false, isBilateral: true });
+    } else {
+      countries[twIdx].resources.militaryPower = clamp(countries[twIdx].resources.militaryPower + 3, 0, 200);
+      actions.push({ countryId: 'taiwan', countryName: 'Taiwan', targetCountryId: 'china', targetCountryName: 'China', description: 'Activates emergency defense protocols in response to PLA provocations. Reservists mobilized.', hostile: false, isBilateral: true });
+    }
+  }
+
+  // ── India ↔ Pakistan (Kashmir) ────────────────────────────────────────────
+  const inIdx = find('india'), pkIdx = find('pakistan');
+  if (inIdx !== -1 && pkIdx !== -1 && Math.random() < 0.45) {
+    const roll = Math.random();
+    if (roll < 0.50) {
+      countries[inIdx].resources.stability = clamp(countries[inIdx].resources.stability - 2, 0, 100);
+      countries[pkIdx].resources.stability = clamp(countries[pkIdx].resources.stability - 3, 0, 100);
+      countries[inIdx].resources.militaryPower = clamp(countries[inIdx].resources.militaryPower - 1, 0, 200);
+      countries[pkIdx].resources.militaryPower = clamp(countries[pkIdx].resources.militaryPower - 1, 0, 200);
+      actions.push({ countryId: 'pakistan', countryName: 'Pakistan', targetCountryId: 'india', targetCountryName: 'India', description: 'Cross-border firing exchange along Line of Control in Kashmir. Both sides report casualties.', hostile: false, isBilateral: true });
+    } else if (roll < 0.75) {
+      countries[pkIdx].resources.stability = clamp(countries[pkIdx].resources.stability - 4, 0, 100);
+      actions.push({ countryId: 'india', countryName: 'India', targetCountryId: 'pakistan', targetCountryName: 'Pakistan', description: 'Indian forces conduct surgical strike across LoC targeting militant launchpads in PoK.', hostile: false, isBilateral: true });
+    } else {
+      // Rare: both sides pull back from escalation
+      countries[inIdx].resources.stability = clamp(countries[inIdx].resources.stability + 1, 0, 100);
+      countries[pkIdx].resources.stability = clamp(countries[pkIdx].resources.stability + 1, 0, 100);
+      actions.push({ countryId: 'india', countryName: 'India', targetCountryId: 'pakistan', targetCountryName: 'Pakistan', description: 'India-Pakistan hotline call de-escalates Kashmir tensions. Ceasefire holds for now.', hostile: false, isBilateral: true });
+    }
+  }
+
+  // ── Iran ↔ Israel (proxy & direct) ────────────────────────────────────────
+  const irIdx = find('iran'), isIdx = find('israel');
+  if (irIdx !== -1 && isIdx !== -1 && Math.random() < 0.40) {
+    const roll = Math.random();
+    if (roll < 0.55) {
+      countries[isIdx].resources.stability = clamp(countries[isIdx].resources.stability - 4, 0, 100);
+      actions.push({ countryId: 'iran', countryName: 'Iran', targetCountryId: 'israel', targetCountryName: 'Israel', description: 'Iranian-backed Hezbollah fires rockets into northern Israel. Iron Dome intercepts most projectiles.', hostile: false, isBilateral: true });
+    } else {
+      countries[irIdx].resources.militaryPower = clamp(countries[irIdx].resources.militaryPower - 4, 0, 200);
+      countries[irIdx].resources.stability = clamp(countries[irIdx].resources.stability - 3, 0, 100);
+      actions.push({ countryId: 'israel', countryName: 'Israel', targetCountryId: 'iran', targetCountryName: 'Iran', description: 'Israeli air force strikes Iranian-linked weapons depot in Syria. Targeted facility destroyed.', hostile: false, isBilateral: true });
+    }
+  }
+
+  // ── North Korea → South Korea / Japan (provocation) ──────────────────────
+  const nkIdx = find('north-korea'), skIdx = find('south-korea'), jpIdx = find('japan');
+  if (nkIdx !== -1 && Math.random() < 0.40) {
+    const roll = Math.random();
+    if (roll < 0.60) {
+      if (skIdx !== -1) countries[skIdx].resources.stability = clamp(countries[skIdx].resources.stability - 3, 0, 100);
+      if (jpIdx !== -1) countries[jpIdx].resources.stability = clamp(countries[jpIdx].resources.stability - 2, 0, 100);
+      countries[nkIdx].resources.militaryPower = clamp(countries[nkIdx].resources.militaryPower + 2, 0, 200);
+      actions.push({ countryId: 'north-korea', countryName: 'North Korea', description: 'Launches ballistic missile that flies over Japanese territorial waters before splashing in Pacific.', hostile: false, isBilateral: true });
+    } else {
+      if (skIdx !== -1) countries[skIdx].resources.stability = clamp(countries[skIdx].resources.stability - 4, 0, 100);
+      actions.push({ countryId: 'north-korea', countryName: 'North Korea', description: 'Shells South Korean islands near disputed maritime boundary. Seoul emergency cabinet meets.', hostile: false, isBilateral: true });
+    }
+  }
+
+  // ── Saudi Arabia ↔ Iran (proxy) ────────────────────────────────────────────
+  const saIdx = find('saudi-arabia');
+  if (saIdx !== -1 && irIdx !== -1 && Math.random() < 0.35) {
+    const roll = Math.random();
+    if (roll < 0.55) {
+      countries[saIdx].resources.stability = clamp(countries[saIdx].resources.stability - 3, 0, 100);
+      actions.push({ countryId: 'iran', countryName: 'Iran', targetCountryId: 'saudi-arabia', targetCountryName: 'Saudi Arabia', description: 'Houthi drone strike on Saudi oil infrastructure. Aramco production cut by 8% for two days.', hostile: false, isBilateral: true });
+    } else {
+      countries[irIdx].resources.stability = clamp(countries[irIdx].resources.stability - 2, 0, 100);
+      actions.push({ countryId: 'saudi-arabia', countryName: 'Saudi Arabia', targetCountryId: 'iran', targetCountryName: 'Iran', description: 'Saudi-backed forces launch counter-offensive in Yemen against Iranian proxy forces.', hostile: false, isBilateral: true });
+    }
+  }
+
+  // ── China → India (border provocation) ────────────────────────────────────
+  if (chIdx !== -1 && inIdx !== -1 && Math.random() < 0.30) {
+    countries[inIdx].resources.stability = clamp(countries[inIdx].resources.stability - 2, 0, 100);
+    countries[inIdx].resources.militaryPower = clamp(countries[inIdx].resources.militaryPower - 1, 0, 200);
+    actions.push({ countryId: 'china', countryName: 'China', targetCountryId: 'india', targetCountryName: 'India', description: 'PLA troops advance into disputed Himalayan territory. India deploys additional mountain brigades.', hostile: false, isBilateral: true });
+  }
 }
 
 function actAsNatoAlly(countries: Country[], idx: number, player: Country, roll: number, actions: AiCountryAction[]) {

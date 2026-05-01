@@ -18,6 +18,7 @@ import {
   FlaskConical,
   Megaphone,
   Sword,
+  Vote,
 } from 'lucide-react';
 
 interface CountryEntryProps {
@@ -50,6 +51,10 @@ export function CountryEntry({ country, player, onAction }: CountryEntryProps) {
         if (r.influence < 50) return { ok: false, reason: 'Need 50 INF' };
         if (country.resources.stability < 40) return { ok: false, reason: 'Target STBL < 40' };
         return { ok: true };
+      case 'UN':
+        if (r.influence < 30) return { ok: false, reason: 'Need 30 INF' };
+        if (isAlly) return { ok: false, reason: 'Cannot sanction ally' };
+        return { ok: true };
       default: return { ok: true };
     }
   };
@@ -74,11 +79,15 @@ export function CountryEntry({ country, player, onAction }: CountryEntryProps) {
     >
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-4 gap-3">
         <div className="flex-1">
-          <div className="flex items-center gap-2 mb-1">
+          <div className="flex items-center gap-2 mb-1 flex-wrap">
+            <span className="text-lg leading-none">{country.flag}</span>
             <h3 className="font-bold text-base md:text-lg text-slate-100">{country.name}</h3>
             <span className={`text-[9px] md:text-[10px] uppercase font-bold px-1.5 py-0.5 border ${getStanceColor(country.stanceTowardsPlayer)} rounded`}>
               {country.stanceTowardsPlayer}
             </span>
+            {country.nuclearArmed && (
+              <span className="text-[8px] font-black text-amber-400 bg-amber-950/30 border border-amber-500/20 px-1.5 py-0.5 rounded">☢ NUCLEAR</span>
+            )}
           </div>
           <p className="text-xs md:text-sm text-slate-400 italic line-clamp-2 md:line-clamp-none leading-relaxed">{country.description}</p>
         </div>
@@ -103,6 +112,7 @@ export function CountryEntry({ country, player, onAction }: CountryEntryProps) {
           <ActionButton action="Sanction" icon={<AlertCircle size={14} />} affordance={can('Sanction')} onClick={() => onAction('Sanction')} />
           <ActionButton action="Military" icon={<Shield size={14} />} affordance={can('Military')} onClick={() => onAction('Military')} />
           <ActionButton action="War" icon={<Sword size={14} className="animate-pulse" />} affordance={can('War')} onClick={() => onAction('War')} />
+          {!isAlly && <ActionButton action="UN" icon={<Vote size={14} />} affordance={can('UN')} onClick={() => onAction('UN')} />}
         </div>
       )}
     </motion.div>

@@ -31,8 +31,8 @@ import { SidePanel } from './components/SidePanel.tsx';
 import { TurnRecapModal } from './components/TurnRecapModal.tsx';
 import { StockMarket } from './components/StockMarket.tsx';
 import { TwitterFeed } from './components/TwitterFeed.tsx';
-import { INITIAL_COUNTRIES, TECH_TREE, COUNTRY_PASSIVE_MODIFIERS, RIVAL_COUNTRIES, getInitialStance } from './constants.ts';
-import { GameState, Country, ResourceSet, ActionType, Toast, HistoryPoint, TurnRecap, Stock, StockHolding } from './types.ts';
+import { INITIAL_COUNTRIES, TECH_TREE, COUNTRY_PASSIVE_MODIFIERS, RIVAL_COUNTRIES, getInitialStance, INITIAL_NUCLEAR_PROGRAMS, NUCLEAR_ADVANCE_PER_TURN, SPACE_MILESTONES, SPACE_MILESTONE_ORDER, INITIAL_REGIONAL_CONFLICTS } from './constants.ts';
+import { GameState, Country, ResourceSet, ActionType, Toast, HistoryPoint, TurnRecap, Stock, StockHolding, SpaceMilestone } from './types.ts';
 import { generateNewsEvent, getAdvisorAdvice } from './services/geminiService.ts';
 import { clearSavedGame, evaluateOutcome, loadGameState, saveGameState } from './gameLogic.ts';
 import { buildForecast } from './forecast.ts';
@@ -53,6 +53,9 @@ const INITIAL_STATE: GameState = {
   stocks: INITIAL_STOCKS.map(s => ({ ...s, priceHistory: [] })),
   portfolio: [],
   tweetFeed: [],
+  nuclearPrograms: INITIAL_NUCLEAR_PROGRAMS.map(p => ({ ...p })),
+  spaceAchievements: [],
+  regionalConflicts: INITIAL_REGIONAL_CONFLICTS.map(c => ({ ...c })),
 };
 
 function snapshot(country: Country, turn: number): HistoryPoint {
@@ -118,6 +121,9 @@ export default function App() {
       stocks: INITIAL_STOCKS.map(s => ({ ...s, priceHistory: [] })),
       portfolio: [],
       tweetFeed: [],
+      nuclearPrograms: INITIAL_NUCLEAR_PROGRAMS.map(p => ({ ...p })),
+      spaceAchievements: [],
+      regionalConflicts: INITIAL_REGIONAL_CONFLICTS.map(c => ({ ...c })),
     });
     setShowBriefing(true);
   };
@@ -275,6 +281,58 @@ export default function App() {
       const aiNewsLines = aiActions.filter(a => a.hostile).map(a => `${a.countryName}: ${a.description}`);
 
       // Generate world leader tweets and classified intel hints for this turn
+      // ── Nuclear program advancement ──────────────────────────────────────
+      const newlyNuclear: string[] = [];
+      const updatedNuclearPrograms = (prev.nuclearPrograms ?? []).map(prog => {
+        const country = updatedCountries.find(c => c.id === prog.countryId);
+        if (!country || country.nuclearArmed) return prog;
+        const advance = NUCLEAR_ADVANCE_PER_TURN[prog.countryId] ?? 1;
+        const newProgress = Math.min(100, prog.progress + advance);
+        if (newProgress >= 100) newlyNuclear.push(prog.countryId);
+        return { ...prog, progress: newProgress };
+      });
+      // Promote countries that crossed 100%
+      for (const id of newlyNuclear) {
+        const idx = updatedCountries.findIndex(c => c.id === id);
+        if (idx !== -1) {
+          updatedCountries[idx] = {
+            ...updatedCountries[idx],
+            nuclearArmed: true,
+            resources: {
+              ...updatedCountries[idx].resources,
+              militaryPower: Math.min(200, updatedCountries[idx].resources.militaryPower + 25),
+            },
+          };
+        }
+      }
+
+      // ── Space race milestone check ────────────────────────────────────────
+      const newAchievements = [...(prev.spaceAchievements ?? [])];
+      const newSpaceNews: string[] = [];
+      for (const country of updatedCountries) {
+        for (const ms of SPACE_MILESTONE_ORDER) {
+          const threshold = SPACE_MILESTONES[ms as SpaceMilestone];
+          const alreadyAchieved = newAchievements.some(a => a.milestone === ms && a.countryId === country.id);
+          const firstAchieved = newAchievements.some(a => a.milestone === ms);
+          if (!alreadyAchieved && country.resources.science >= threshold.scienceRequired) {
+            newAchievements.push({ countryId: country.id, milestone: ms as SpaceMilestone, turn: newTurn });
+            const idx = updatedCountries.findIndex(c => c.id === country.id);
+            if (idx !== -1) {
+              updatedCountries[idx] = {
+                ...updatedCountries[idx],
+                resources: {
+                  ...updatedCountries[idx].resources,
+                  influence: Math.min(100, updatedCountries[idx].resources.influence + threshold.influenceBonus + (firstAchieved ? 0 : 10)),
+                  militaryPower: Math.min(200, updatedCountries[idx].resources.militaryPower + threshold.militaryBonus),
+                },
+              };
+            }
+            const bonus = firstAchieved ? '' : ' (FIRST IN THE WORLD)';
+            newSpaceNews.push(`🚀 SPACE MILESTONE: ${country.name} achieves ${threshold.label}${bonus}!`);
+          }
+        }
+      }
+
       const turnTweets = generateTurnTweets(
         { ...prev, countries: updatedCountries },
         aiActions.map(a => a.description),
@@ -282,16 +340,24 @@ export default function App() {
       const intelTweets = generateIntelHints({ ...prev, countries: updatedCountries });
       const allNewTweets = [...intelTweets, ...turnTweets]; // intel first (top of feed)
 
+      const nuclearBreakingNews = newlyNuclear.map(id => {
+        const c = updatedCountries.find(x => x.id === id);
+        return c ? `☢️ BREAKING: ${c.flag} ${c.name} has conducted its first nuclear test. The world changes.` : '';
+      }).filter(Boolean);
+
       const next: GameState = {
         ...prev,
         turn: newTurn,
         countries: updatedCountries,
-        newsLog: [...prev.newsLog, recap.eventTitle, ...aiNewsLines, ...marketHeadlines],
+        newsLog: [...prev.newsLog, recap.eventTitle, ...aiNewsLines, ...marketHeadlines, ...newSpaceNews, ...nuclearBreakingNews],
         history: [...prev.history, snapshot(player, newTurn)],
         lastRecap: recap,
         stocks: updatedStocks,
         portfolio: prev.portfolio ?? [],
         tweetFeed: [...(prev.tweetFeed ?? []), ...allNewTweets].slice(-100),
+        nuclearPrograms: updatedNuclearPrograms,
+        spaceAchievements: newAchievements,
+        regionalConflicts: prev.regionalConflicts ?? INITIAL_REGIONAL_CONFLICTS,
       };
       next.outcome = evaluateOutcome(next) ?? undefined;
       return next;
@@ -505,6 +571,37 @@ export default function App() {
             }
           }
           break;
+        case 'UN': {
+          if (player.resources.influence >= 30) {
+            player.resources.influence -= 30;
+            // P5 members: usa, russia, china, uk, eu
+            const p5 = ['usa', 'russia', 'china', 'uk', 'eu'];
+            const playerIsP5 = p5.includes(prev.playerCountryId);
+            const alliedP5 = prev.countries.filter(c =>
+              p5.includes(c.id) && c.id !== prev.playerCountryId &&
+              (c.stanceTowardsPlayer === 'Ally' || c.stanceTowardsPlayer === 'Friendly')
+            );
+            const hostileP5 = prev.countries.filter(c =>
+              p5.includes(c.id) && c.id !== prev.playerCountryId &&
+              (c.stanceTowardsPlayer === 'Hostile' || c.stanceTowardsPlayer === 'At War')
+            );
+            const vetoed = hostileP5.length > 0 || (!playerIsP5 && alliedP5.length === 0);
+            if (vetoed) {
+              player.resources.influence = Math.max(0, player.resources.influence - 5);
+              logMessage = `UN resolution against ${target.name} VETOED by ${hostileP5[0]?.name ?? 'Security Council member'}. International embarrassment costs influence.`;
+              toastType = 'warning';
+            } else {
+              target.resources.stability = Math.max(0, target.resources.stability - 15);
+              target.resources.influence = Math.max(0, target.resources.influence - 10);
+              logMessage = `UN Security Council passes resolution condemning ${target.name}. International isolation intensifies.`;
+              toastType = 'success';
+            }
+          } else {
+            logMessage = 'Insufficient influence (30 required) for UN resolution.';
+            toastType = 'error';
+          }
+          break;
+        }
       }
 
       addToast(logMessage, toastType);

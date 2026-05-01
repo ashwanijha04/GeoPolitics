@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Country, DiplomaticStance, TechNode } from './types.ts';
+import { Country, DiplomaticStance, NuclearProgram, RegionalConflict, SpaceMilestone, TechNode } from './types.ts';
 
 // Per-turn passive resource modifiers keyed by country ID.
 // These represent structural advantages/disadvantages (debt, war drain, tech edge, etc.)
@@ -607,5 +607,64 @@ export const INITIAL_COUNTRIES: Country[] = [
       { name: "Africa's Giant", description: 'Continental leadership ambitions generate passive influence.' },
     ],
     resources: { gdp: 0.44, stability: 46, militaryPower: 38, influence: 30, population: 224, science: 22 },
+  },
+];
+
+
+// ── Nuclear programs ─────────────────────────────────────────────────────────
+// Non-nuclear countries with active programs. Progress 0–100; at 100 → nuclear.
+export const INITIAL_NUCLEAR_PROGRAMS: NuclearProgram[] = [
+  { countryId: 'iran',          progress: 62, detected: false }, // very close
+  { countryId: 'saudi-arabia',  progress: 14, detected: false }, // early stage
+  { countryId: 'south-korea',   progress: 8,  detected: false }, // latent capability
+  { countryId: 'turkey',        progress: 4,  detected: false }, // speculative
+];
+
+// Per-turn nuclear program advancement (if country is not yet nuclear)
+export const NUCLEAR_ADVANCE_PER_TURN: Record<string, number> = {
+  'iran':         6,   // fastest — declared ambition
+  'saudi-arabia': 2,
+  'south-korea':  1,
+  'turkey':       0.5,
+};
+
+// ── Space race thresholds (cumulative science) ───────────────────────────────
+export const SPACE_MILESTONES: Record<SpaceMilestone, { scienceRequired: number; label: string; icon: string; influenceBonus: number; militaryBonus: number }> = {
+  satellite: { scienceRequired: 150,  label: 'First Satellite',  icon: '🛰️',  influenceBonus: 8,  militaryBonus: 2  },
+  moon:      { scienceRequired: 400,  label: 'Moon Landing',     icon: '🌕',  influenceBonus: 20, militaryBonus: 5  },
+  station:   { scienceRequired: 700,  label: 'Space Station',    icon: '🚀',  influenceBonus: 15, militaryBonus: 8  },
+  mars:      { scienceRequired: 1200, label: 'Mars Mission',     icon: '🔴',  influenceBonus: 40, militaryBonus: 15 },
+};
+export const SPACE_MILESTONE_ORDER: SpaceMilestone[] = ['satellite', 'moon', 'station', 'mars'];
+
+// ── Starting regional conflicts ──────────────────────────────────────────────
+export const INITIAL_REGIONAL_CONFLICTS: RegionalConflict[] = [
+  {
+    id: 'kashmir',
+    countryAId: 'india',
+    countryBId: 'pakistan',
+    name: 'Kashmir Conflict',
+    intensity: 55,
+  },
+  {
+    id: 'taiwan-strait',
+    countryAId: 'china',
+    countryBId: 'taiwan',
+    name: 'Taiwan Strait Crisis',
+    intensity: 65,
+  },
+  {
+    id: 'russia-ukraine',
+    countryAId: 'russia',
+    countryBId: 'ukraine',
+    name: 'Russo-Ukrainian War',
+    intensity: 90,
+  },
+  {
+    id: 'middle-east',
+    countryAId: 'iran',
+    countryBId: 'israel',
+    name: 'Iran-Israel Confrontation',
+    intensity: 50,
   },
 ];

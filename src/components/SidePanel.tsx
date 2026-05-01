@@ -4,9 +4,10 @@
  */
 
 import { motion } from 'motion/react';
-import { Shield, TrendingUp, Target, AlertTriangle, CheckCircle2, Info, Flame } from 'lucide-react';
+import { Shield, TrendingUp, Target, AlertTriangle, CheckCircle2, Info, Flame, Rocket, Swords } from 'lucide-react';
 import { GameState } from '../types.ts';
 import { Alert, advisorAuto, buildForecast } from '../forecast.ts';
+import { SPACE_MILESTONES, SPACE_MILESTONE_ORDER } from '../constants.ts';
 
 interface Props {
   gameState: GameState;
@@ -24,6 +25,9 @@ export function SidePanel({ gameState }: Props) {
   return (
     <div className="space-y-4">
       <ForecastCard alerts={alerts} />
+      <SpaceRaceCard gameState={gameState} />
+      <NuclearCard gameState={gameState} />
+      <ConflictsCard gameState={gameState} />
 
       <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-4">
         <div className="flex items-center gap-2 mb-3">
@@ -83,6 +87,117 @@ function ForecastCard({ alerts }: { alerts: Alert[] }) {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function SpaceRaceCard({ gameState }: { gameState: GameState }) {
+  const achievements = gameState.spaceAchievements ?? [];
+  if (achievements.length === 0 && (gameState.countries.every(c => c.resources.science < 100))) return null;
+
+  return (
+    <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-4">
+      <div className="flex items-center gap-2 mb-3">
+        <Rocket size={14} className="text-blue-400" />
+        <span className="text-[10px] font-black uppercase tracking-[0.3em] text-blue-400">Space Race</span>
+      </div>
+      <div className="space-y-2">
+        {SPACE_MILESTONE_ORDER.map(ms => {
+          const info = SPACE_MILESTONES[ms];
+          const achieved = achievements.filter(a => a.milestone === ms);
+          const first = achieved[0];
+          const firstCountry = first ? gameState.countries.find(c => c.id === first.countryId) : null;
+          return (
+            <div key={ms} className="flex items-center gap-2">
+              <span className="text-base w-6 text-center">{info.icon}</span>
+              <div className="flex-1 min-w-0">
+                <div className="text-[10px] font-bold text-slate-300">{info.label}</div>
+                <div className="text-[8px] text-slate-500">{info.scienceRequired} SCI required</div>
+              </div>
+              {firstCountry ? (
+                <span className="text-xs" title={`${firstCountry.name} — Turn ${first!.turn}`}>{firstCountry.flag}</span>
+              ) : (
+                <span className="text-[8px] text-slate-600 italic">unclaimed</span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function NuclearCard({ gameState }: { gameState: GameState }) {
+  const programs = (gameState.nuclearPrograms ?? []).filter(p => p.detected && !gameState.countries.find(c => c.id === p.countryId)?.nuclearArmed);
+  const nuclear = gameState.countries.filter(c => c.nuclearArmed && c.id !== gameState.playerCountryId);
+  if (nuclear.length === 0 && programs.length === 0) return null;
+
+  return (
+    <div className="bg-slate-900/60 border border-amber-900/30 rounded-2xl p-4">
+      <div className="flex items-center gap-2 mb-3">
+        <span className="text-amber-400 text-sm">☢</span>
+        <span className="text-[10px] font-black uppercase tracking-[0.3em] text-amber-400">Nuclear Club</span>
+      </div>
+      <div className="space-y-1.5">
+        {nuclear.map(c => (
+          <div key={c.id} className="flex items-center gap-2">
+            <span className="text-base">{c.flag}</span>
+            <span className="text-[10px] font-bold text-slate-300 flex-1">{c.name}</span>
+            <span className="text-[8px] text-amber-400 font-bold">CONFIRMED</span>
+          </div>
+        ))}
+        {programs.map(p => {
+          const c = gameState.countries.find(x => x.id === p.countryId);
+          if (!c) return null;
+          return (
+            <div key={p.countryId} className="flex items-center gap-2">
+              <span className="text-base">{c.flag}</span>
+              <span className="text-[10px] font-bold text-slate-300 flex-1">{c.name}</span>
+              <div className="flex items-center gap-1">
+                <div className="w-12 h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                  <div className="h-full bg-purple-500 rounded-full" style={{ width: `${p.progress}%` }} />
+                </div>
+                <span className="text-[8px] text-purple-400 font-bold">{p.progress.toFixed(0)}%</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function ConflictsCard({ gameState }: { gameState: GameState }) {
+  const conflicts = gameState.regionalConflicts ?? [];
+  if (conflicts.length === 0) return null;
+
+  const INTENSITY_COLOR = (i: number) =>
+    i >= 75 ? 'text-red-400 bg-red-950/20 border-red-500/20' :
+    i >= 50 ? 'text-orange-400 bg-orange-950/20 border-orange-500/20' :
+    'text-yellow-400 bg-yellow-950/20 border-yellow-500/20';
+
+  return (
+    <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-4">
+      <div className="flex items-center gap-2 mb-3">
+        <Swords size={14} className="text-red-400" />
+        <span className="text-[10px] font-black uppercase tracking-[0.3em] text-red-400">Active Conflicts</span>
+      </div>
+      <div className="space-y-2">
+        {conflicts.map(c => {
+          const cA = gameState.countries.find(x => x.id === c.countryAId);
+          const cB = gameState.countries.find(x => x.id === c.countryBId);
+          return (
+            <div key={c.id} className={`px-2.5 py-2 rounded-xl border text-[10px] ${INTENSITY_COLOR(c.intensity)}`}>
+              <div className="font-black mb-0.5">{c.name}</div>
+              <div className="flex items-center gap-1 text-slate-400">
+                <span>{cA?.flag}</span><span>{cA?.name}</span>
+                <span className="mx-1">⚔</span>
+                <span>{cB?.flag}</span><span>{cB?.name}</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

@@ -16,7 +16,14 @@ export interface ActionInfo {
   tone: 'good' | 'risky' | 'aggressive' | 'neutral';
 }
 
-export const ACTION_INFO: Record<Exclude<ActionType, 'UnlockTech'>, ActionInfo> = {
+export const ACTION_INFO: Record<Exclude<ActionType, 'UnlockTech' | 'UN'>, ActionInfo> & { UN: ActionInfo } = {
+  UN: {
+    label: 'UN Resolution',
+    cost: '−30 INF',
+    effect: '−15 STBL & −10 INF (them) if passed; −5 INF if vetoed',
+    blurb: 'Bring a country before the Security Council. P5 allies improve odds; hostile P5 members veto.',
+    tone: 'risky',
+  },
   Trade: {
     label: 'Trade',
     cost: '−10 INF',
