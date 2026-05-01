@@ -21,12 +21,14 @@ export function TurnRecapModal({ recap, forecast, player, narrative, onAcknowled
   const eventDelta = recap.eventValueChange ?? 0;
 
   return (
-    <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[120] flex items-end sm:items-center justify-center bg-slate-950/85 backdrop-blur-sm">
       <motion.div
-        initial={{ scale: 0.95, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        exit={{ scale: 0.95, opacity: 0 }}
-        className="max-w-2xl w-full bg-slate-900 border border-blue-500/30 rounded-3xl shadow-2xl shadow-blue-900/40 relative overflow-y-auto max-h-[90vh]"
+        initial={{ y: '100%', opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        exit={{ y: '100%', opacity: 0 }}
+        transition={{ type: 'spring', stiffness: 350, damping: 32 }}
+        className="w-full sm:max-w-2xl bg-slate-900 border-t sm:border border-blue-500/30 sm:rounded-3xl shadow-2xl shadow-blue-900/40 overflow-y-auto overscroll-contain"
+        style={{ maxHeight: '92dvh' }}
       >
         <div className="absolute top-0 right-0 p-4 opacity-5">
           <Globe size={140} />
@@ -143,10 +145,10 @@ export function TurnRecapModal({ recap, forecast, player, narrative, onAcknowled
           </div>
         )}
 
-        <div className="p-6 md:p-8">
+        <div className="sticky bottom-0 p-4 sm:p-6 bg-slate-900 border-t border-slate-800">
           <button
             onClick={onAcknowledge}
-            className="w-full py-3.5 bg-blue-600 hover:bg-blue-500 text-white font-black uppercase tracking-widest rounded-xl transition-all shadow-lg"
+            className="w-full py-4 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-black uppercase tracking-widest rounded-xl transition-all shadow-lg"
           >
             Acknowledge & Resume
           </button>

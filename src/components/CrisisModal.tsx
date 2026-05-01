@@ -33,84 +33,92 @@ export function CrisisModal({ crisis, onChoose }: Props) {
   const chosenOption = crisis.options.find(o => o.id === selected);
 
   return (
-    <div className="fixed inset-0 z-[180] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md">
+    /* Full-screen on mobile, centered card on desktop. The inner div scrolls. */
+    <div className="fixed inset-0 z-[180] flex items-end sm:items-center justify-center bg-slate-950/90 backdrop-blur-md">
       <motion.div
-        initial={{ scale: 0.95, opacity: 0, y: 20 }}
-        animate={{ scale: 1, opacity: 1, y: 0 }}
-        className={`max-w-2xl w-full bg-slate-900 border border-slate-700 rounded-3xl shadow-2xl ${style.glow} overflow-hidden relative`}
+        initial={{ y: '100%', opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        exit={{ y: '100%', opacity: 0 }}
+        transition={{ type: 'spring', stiffness: 350, damping: 32 }}
+        className={`w-full sm:max-w-2xl bg-slate-900 border-t sm:border border-slate-700 sm:rounded-3xl shadow-2xl flex flex-col`}
+        style={{ maxHeight: '92dvh' }}
       >
         {/* Urgency bar */}
-        <div className={`h-1 w-full ${style.bar}`} />
+        <div className={`h-1 w-full flex-shrink-0 ${style.bar} sm:rounded-t-3xl`} />
 
-        <div className="p-6 md:p-8 border-b border-slate-800">
-          <div className="flex items-center gap-3 mb-4">
-            <div className={`p-2 rounded-xl border ${style.badge}`}>
-              {crisis.urgency === 'critical' ? <Zap size={18} /> : <AlertTriangle size={18} />}
-            </div>
-            <div>
-              <div className="text-[9px] font-black uppercase tracking-[0.3em] text-slate-500 mb-0.5">
-                CRISIS — Turn {crisis.turn} · Decision Required
+        {/* Scrollable body */}
+        <div className="overflow-y-auto overscroll-contain flex-1">
+          <div className="p-5 sm:p-8 border-b border-slate-800">
+            <div className="flex items-center gap-3 mb-3">
+              <div className={`p-2 rounded-xl border flex-shrink-0 ${style.badge}`}>
+                {crisis.urgency === 'critical' ? <Zap size={16} /> : <AlertTriangle size={16} />}
               </div>
-              <h2 className={`text-xl md:text-2xl font-black ${style.title}`}>{crisis.title}</h2>
+              <div>
+                <div className="text-[9px] font-black uppercase tracking-[0.3em] text-slate-500 mb-0.5">
+                  CRISIS · Turn {crisis.turn} · Decision Required
+                </div>
+                <h2 className={`text-lg sm:text-2xl font-black ${style.title} leading-tight`}>{crisis.title}</h2>
+              </div>
             </div>
+            <p className="text-slate-300 leading-relaxed text-sm">{crisis.description}</p>
           </div>
-          <p className="text-slate-300 leading-relaxed text-sm md:text-base">{crisis.description}</p>
+
+          <AnimatePresence mode="wait">
+            {!confirmed ? (
+              <motion.div key="options" initial={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                <div className="p-5 sm:p-8 space-y-2.5">
+                  <div className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500 mb-3">Choose your response:</div>
+                  {crisis.options.map(option => (
+                    <button
+                      key={option.id}
+                      onClick={() => setSelected(option.id)}
+                      className={`w-full text-left p-4 rounded-2xl border transition-all active:scale-[0.99] ${
+                        selected === option.id
+                          ? 'border-blue-500 bg-blue-950/30'
+                          : 'border-slate-800 bg-slate-900/50 hover:border-slate-600'
+                      }`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className={`w-4 h-4 rounded-full border-2 mt-0.5 flex-shrink-0 transition-all ${
+                          selected === option.id ? 'border-blue-500 bg-blue-500' : 'border-slate-600'
+                        }`} />
+                        <div className="flex-1">
+                          <div className="font-black text-white text-sm mb-1">{option.label}</div>
+                          <div className="text-xs text-slate-400 leading-relaxed">{option.description}</div>
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </motion.div>
+            ) : (
+              <motion.div
+                key="result"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="p-8 text-center space-y-4"
+              >
+                <div className="text-4xl">⚡</div>
+                <div className="text-lg font-black text-white">{chosenOption?.label}</div>
+                <p className="text-slate-300 text-sm leading-relaxed">{chosenOption?.consequence || 'Decision executed. Consequences will follow.'}</p>
+                <div className="text-xs text-slate-500 italic animate-pulse">Processing consequences…</div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
-        <AnimatePresence mode="wait">
-          {!confirmed ? (
-            <motion.div key="options" initial={{ opacity: 1 }} exit={{ opacity: 0 }}>
-              <div className="p-6 md:p-8 space-y-3">
-                <div className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500 mb-4">Choose your response:</div>
-                {crisis.options.map(option => (
-                  <motion.button
-                    key={option.id}
-                    whileHover={{ scale: 1.01 }}
-                    whileTap={{ scale: 0.99 }}
-                    onClick={() => setSelected(option.id)}
-                    className={`w-full text-left p-4 rounded-2xl border transition-all ${
-                      selected === option.id
-                        ? 'border-blue-500 bg-blue-950/30'
-                        : 'border-slate-800 bg-slate-900/50 hover:border-slate-600'
-                    }`}
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className={`w-4 h-4 rounded-full border-2 mt-0.5 flex-shrink-0 transition-all ${
-                        selected === option.id ? 'border-blue-500 bg-blue-500' : 'border-slate-600'
-                      }`} />
-                      <div className="flex-1">
-                        <div className="font-black text-white mb-1">{option.label}</div>
-                        <div className="text-xs text-slate-400 leading-relaxed">{option.description}</div>
-                      </div>
-                    </div>
-                  </motion.button>
-                ))}
-              </div>
-
-              <div className="px-6 md:px-8 pb-6 md:pb-8">
-                <button
-                  onClick={handleConfirm}
-                  disabled={!selected}
-                  className="w-full py-4 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-black uppercase tracking-widest rounded-xl transition-all shadow-lg"
-                >
-                  Execute Decision
-                </button>
-              </div>
-            </motion.div>
-          ) : (
-            <motion.div
-              key="result"
-              initial={{ opacity: 0, scale: 0.98 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="p-6 md:p-8 text-center space-y-4"
+        {/* Sticky confirm button — always visible at bottom */}
+        {!confirmed && (
+          <div className="flex-shrink-0 p-4 sm:p-6 border-t border-slate-800 bg-slate-900">
+            <button
+              onClick={handleConfirm}
+              disabled={!selected}
+              className="w-full py-4 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-black uppercase tracking-widest rounded-xl transition-all shadow-lg text-sm"
             >
-              <div className="text-4xl">⚡</div>
-              <div className="text-lg font-black text-white">{chosenOption?.label}</div>
-              <p className="text-slate-300 text-sm leading-relaxed">{chosenOption?.consequence || 'Decision executed. Consequences will follow.'}</p>
-              <div className="text-xs text-slate-500 italic animate-pulse">Processing consequences…</div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+              {selected ? 'Execute Decision' : 'Select a response above'}
+            </button>
+          </div>
+        )}
       </motion.div>
     </div>
   );
