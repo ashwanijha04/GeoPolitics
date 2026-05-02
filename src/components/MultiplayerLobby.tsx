@@ -136,13 +136,17 @@ export function MultiplayerLobby({ onGameStart, onBack, prefillCode }: Props) {
   };
 
   // Non-host: detect game start from Firebase
+  // Watch both config.started AND room.state so we catch the state when it arrives
   useEffect(() => {
     if (!room?.config?.started || !uid || !selectedCountry) return;
-    const myPlayer = room.players[uid];
-    if (!myPlayer?.isHost && room.state) {
-      onGameStart(roomCode, uid, selectedCountry, false, room.state);
-    }
-  }, [room?.config?.started]);
+    const myPlayer = room?.players?.[uid];
+    if (myPlayer?.isHost) return; // host already started
+    if (!room.state) return;      // wait for host to push state
+    onGameStart(roomCode, uid, selectedCountry, false, {
+      ...room.state,
+      playerCountryId: selectedCountry, // use OUR country, not host's
+    });
+  }, [room?.config?.started, !!room?.state]);
 
   const copyCode = () => {
     navigator.clipboard.writeText(shareUrl || roomCode);

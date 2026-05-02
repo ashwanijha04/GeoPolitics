@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Globe,
@@ -102,43 +102,71 @@ export default function App() {
     const params = new URLSearchParams(window.location.search);
     return params.get('room') ?? undefined;
   });
-  const [mpRoom, setMpRoom] = useState<string | null>(null);
-  const [mpUid, setMpUid] = useState<string>('');
+  const [mpRoom, setMpRoom]       = useState<string | null>(null);
+  const [mpUid, setMpUid]         = useState<string>('');
+  const [myCountryId, setMyCountryId] = useState<string>(''); // personal country, never overwritten
+  const mpSkipRef = useRef(false); // true while WE are pushing to Firebase
   const { ctx: mpCtx, syncState: mpSyncState, submitTurn: mpSubmitTurn, clearReady: mpClearReady } = useMultiplayer(mpRoom, mpUid);
   const isMultiplayer = !!mpRoom;
 
-  // Persist on every meaningful change.
+  // Sync local state to Firebase after every change (all players push their view of the world)
   useEffect(() => {
     if (!gameState.gameStarted) return;
-    if (isMultiplayer) {
-      // In multiplayer, host syncs to Firebase; non-host reads from it
-      if (mpCtx?.isHost) mpSyncState(gameState);
-    } else {
+    if (isMultiplayer && myCountryId) {
+      mpSkipRef.current = true;
+      mpSyncState(gameState).finally(() => {
+        setTimeout(() => { mpSkipRef.current = false; }, 400);
+      });
+    } else if (!isMultiplayer) {
       saveGameState(gameState);
     }
   }, [gameState]);
 
-  // Non-host: when Firebase state updates with a new turn, adopt it
+  // Subscribe to ALL Firebase state changes from OTHER players
+  // Preserves our own playerCountryId and portfolio — only world state is shared
   useEffect(() => {
-    if (!mpCtx || mpCtx.isHost) return;
-    const remoteState = mpCtx.room.state;
-    if (!remoteState) return;
-    if (remoteState.turn !== gameState.turn || !gameState.gameStarted) {
-      setGameState(remoteState);
-      if (remoteState.turn > gameState.turn) setRecapOpen(true);
-    }
-  }, [mpCtx?.room.state?.turn]);
+    if (!mpCtx || !myCountryId || mpSkipRef.current) return;
+    const remote = mpCtx.room.state;
+    if (!remote) return;
 
-  // Host: when all players are ready, auto-advance the turn
+    setGameState(prev => {
+      // Skip if nothing meaningful changed
+      if (
+        remote.turn === prev.turn &&
+        remote.worldTension === prev.worldTension &&
+        remote.newsLog.length === prev.newsLog.length &&
+        remote.countries.every((rc, i) => {
+          const lc = prev.countries[i];
+          return lc &&
+            rc.resources.gdp === lc.resources.gdp &&
+            rc.resources.stability === lc.resources.stability &&
+            rc.resources.militaryPower === lc.resources.militaryPower &&
+            rc.stanceTowardsPlayer === lc.stanceTowardsPlayer;
+        })
+      ) return prev;
+
+      const wasNewTurn = remote.turn > prev.turn;
+      if (wasNewTurn) setTimeout(() => setRecapOpen(true), 50);
+
+      // Adopt shared world, keep personal overlay
+      return {
+        ...remote,
+        playerCountryId: myCountryId,
+        portfolio: prev.portfolio ?? [],
+      };
+    });
+  }, [mpCtx?.room.state]);
+
+  // Host: when all players are ready, run nextTurn
   useEffect(() => {
     if (!mpCtx?.allReady || !mpCtx.isHost || isProcessing || gameState.outcome) return;
     mpClearReady().then(() => nextTurn());
   }, [mpCtx?.allReady]);
 
-  const playerCountry = useMemo(
-    () => gameState.countries.find(c => c.id === gameState.playerCountryId),
-    [gameState.countries, gameState.playerCountryId],
-  );
+  const playerCountry = useMemo(() => {
+    const id = (isMultiplayer && myCountryId) ? myCountryId : gameState.playerCountryId;
+    return gameState.countries.find(c => c.id === id);
+  }, [gameState.countries, gameState.playerCountryId, myCountryId, isMultiplayer]);
 
   const addToast = useCallback((message: string, type: Toast['type'] = 'info') => {
     setToasts(prev => {
@@ -1174,11 +1202,9 @@ export default function App() {
               setShowMpLobby(false);
               setMpRoom(roomCode);
               setMpUid(uid);
+              setMyCountryId(countryId); // store separately — never overwritten by sync
               if (initialState) {
-                // Host: start with the built initial state
-                // Non-host: adopt the state from Firebase
-                const stateForMe = { ...initialState, playerCountryId: countryId };
-                setGameState(stateForMe);
+                setGameState({ ...initialState, playerCountryId: countryId });
                 setShowBriefing(true);
               }
             }}
