@@ -915,9 +915,9 @@ export default function App() {
                       if (window.confirm('Reset the campaign? Your save will be wiped.')) restart();
                     }}
                     title="Reset and start a new game"
-                    className="hidden md:flex items-center gap-2 px-3 py-2.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-all text-xs font-bold uppercase tracking-wider"
+                    className="flex items-center gap-1.5 px-3 py-2.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-all text-xs font-bold uppercase tracking-wider"
                   >
-                    <RotateCcw size={14} /> Reset
+                    <RotateCcw size={14} /><span className="hidden sm:inline">Reset</span>
                   </button>
                   {isMultiplayer && mpCtx && !recapOpen ? (
                     /* Multiplayer: Submit Turn button */
