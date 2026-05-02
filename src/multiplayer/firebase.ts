@@ -8,7 +8,6 @@
 
 import { initializeApp } from 'firebase/app';
 import { getDatabase } from 'firebase/database';
-import { getAuth, signInAnonymously } from 'firebase/auth';
 
 const firebaseConfig = {
   apiKey: 'AIzaSyAJKk4NqzdFVVI0_3pPWPDTCPAiPYamUuo',
@@ -22,13 +21,16 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 export const db = getDatabase(app);
-export const auth = getAuth(app);
 
-/** Returns the current user's UID, signing in anonymously if needed. */
-export async function getOrCreateUid(): Promise<string> {
-  if (auth.currentUser) return auth.currentUser.uid;
-  const cred = await signInAnonymously(auth);
-  return cred.user.uid;
+/** Generate or retrieve a stable local player ID — no Firebase Auth needed. */
+export function getOrCreateUid(): Promise<string> {
+  const key = 'gs:player-uid';
+  let uid = localStorage.getItem(key);
+  if (!uid) {
+    uid = 'p_' + Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 10);
+    localStorage.setItem(key, uid);
+  }
+  return Promise.resolve(uid);
 }
 
 /** 6-char room code, unambiguous charset */

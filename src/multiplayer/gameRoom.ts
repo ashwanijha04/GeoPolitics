@@ -7,6 +7,7 @@ import {
   ref, set, get, onValue, update, onDisconnect, DataSnapshot,
 } from 'firebase/database';
 import { db, getOrCreateUid, generateRoomCode } from './firebase.ts';
+
 import { GameState } from '../types.ts';
 
 // ─── Types ────────────────────────────────────────────────────────────────────

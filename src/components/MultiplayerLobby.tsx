@@ -57,8 +57,8 @@ export function MultiplayerLobby({ onGameStart, onBack, prefillCode }: Props) {
       setRoomCode(result.roomCode);
       setUid(result.uid);
       setScreen('lobby');
-    } catch (e) {
-      setError('Failed to create room. Check your connection.');
+    } catch (e: any) {
+      setError(`Failed to create room: ${e?.message ?? 'Check your connection.'}`);
     }
     setLoading(false);
   };
@@ -73,8 +73,8 @@ export function MultiplayerLobby({ onGameStart, onBack, prefillCode }: Props) {
       setRoomCode(joinCode.trim().toUpperCase());
       setUid(result.uid);
       setScreen('lobby');
-    } catch (e) {
-      setError('Failed to join. Check the code and try again.');
+    } catch (e: any) {
+      setError(`Failed to join: ${e?.message ?? 'Check the code and try again.'}`);
     }
     setLoading(false);
   };
