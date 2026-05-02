@@ -7,6 +7,7 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Globe, Users, Copy, CheckCircle2, Loader2, Play, ArrowLeft } from 'lucide-react';
 import { INITIAL_COUNTRIES } from '../constants.ts';
+import { deserializeGameState } from '../multiplayer/deserialize.ts';
 import { createRoom, joinRoom, selectCountry, startGame, Room, RoomPlayer } from '../multiplayer/gameRoom.ts';
 import { subscribeToRoom } from '../multiplayer/gameRoom.ts';
 import { useEffect } from 'react';
@@ -142,9 +143,11 @@ export function MultiplayerLobby({ onGameStart, onBack, prefillCode }: Props) {
     const myPlayer = room?.players?.[uid];
     if (myPlayer?.isHost) return; // host already started
     if (!room.state) return;      // wait for host to push state
+    // Deserialize: Firebase converts arrays → numbered objects; this fixes it
+    const safeState = deserializeGameState(room.state);
     onGameStart(roomCode, uid, selectedCountry, false, {
-      ...room.state,
-      playerCountryId: selectedCountry, // use OUR country, not host's
+      ...safeState,
+      playerCountryId: selectedCountry,
     });
   }, [room?.config?.started, !!room?.state]);
 

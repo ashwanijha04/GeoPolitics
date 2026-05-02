@@ -7,6 +7,7 @@ import {
   ref, set, get, onValue, update, onDisconnect, DataSnapshot,
 } from 'firebase/database';
 import { db, getOrCreateUid, generateRoomCode } from './firebase.ts';
+import { deserializeGameState } from './deserialize.ts';
 
 import { GameState } from '../types.ts';
 
@@ -125,7 +126,15 @@ export function subscribeToRoom(
   onChange: (room: Room | null) => void,
 ): () => void {
   const unsub = onValue(ref(db, `games/${roomCode}`), snap => {
-    onChange(snap.exists() ? (snap.val() as Room) : null);
+    if (!snap.exists()) { onChange(null); return; }
+    const raw = snap.val() as Record<string, unknown>;
+    // Deserialize state (Firebase converts arrays → numbered objects)
+    const room: Room = {
+      config: raw.config as RoomConfig,
+      players: (raw.players ?? {}) as Record<string, RoomPlayer>,
+      state: raw.state ? deserializeGameState(raw.state) : undefined,
+    };
+    onChange(room);
   });
   return unsub;
 }

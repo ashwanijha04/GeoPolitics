@@ -46,6 +46,7 @@ import { CrisisModal } from './components/CrisisModal.tsx';
 import { BreakingNews, BreakingNewsItem } from './components/BreakingNews.tsx';
 import { MultiplayerLobby } from './components/MultiplayerLobby.tsx';
 import { useMultiplayer } from './multiplayer/useMultiplayer.ts';
+import { deserializeGameState } from './multiplayer/deserialize.ts';
 import { WorldTheater } from './components/WorldTheater.tsx';
 import { HotDecisions } from './components/HotDecisions.tsx';
 import { generateNarrative } from './narrative.ts';
@@ -129,13 +130,16 @@ export default function App() {
     const remote = mpCtx.room.state;
     if (!remote) return;
 
+    // Deserialize to fix Firebase array→object conversion
+    const safe = deserializeGameState(remote);
+
     setGameState(prev => {
       // Skip if nothing meaningful changed
       if (
-        remote.turn === prev.turn &&
-        remote.worldTension === prev.worldTension &&
-        remote.newsLog.length === prev.newsLog.length &&
-        remote.countries.every((rc, i) => {
+        safe.turn === prev.turn &&
+        safe.worldTension === prev.worldTension &&
+        safe.newsLog.length === prev.newsLog.length &&
+        safe.countries.every((rc, i) => {
           const lc = prev.countries[i];
           return lc &&
             rc.resources.gdp === lc.resources.gdp &&
@@ -145,12 +149,11 @@ export default function App() {
         })
       ) return prev;
 
-      const wasNewTurn = remote.turn > prev.turn;
+      const wasNewTurn = safe.turn > prev.turn;
       if (wasNewTurn) setTimeout(() => setRecapOpen(true), 50);
 
-      // Adopt shared world, keep personal overlay
       return {
-        ...remote,
+        ...safe,
         playerCountryId: myCountryId,
         portfolio: prev.portfolio ?? [],
       };
