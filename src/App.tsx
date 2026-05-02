@@ -19,6 +19,7 @@ import {
   RotateCcw,
   CheckCircle2,
   BarChart2,
+  Users,
 } from 'lucide-react';
 import { ResourceCounter } from './components/ResourceCounter.tsx';
 import { NewsTicker } from './components/NewsTicker.tsx';
@@ -43,6 +44,8 @@ import { runStrategicAiActions } from './aiStrategy.ts';
 import { generateCrisis, applyCrisisChoice } from './crisisEngine.ts';
 import { CrisisModal } from './components/CrisisModal.tsx';
 import { BreakingNews, BreakingNewsItem } from './components/BreakingNews.tsx';
+import { MultiplayerLobby } from './components/MultiplayerLobby.tsx';
+import { useMultiplayer } from './multiplayer/useMultiplayer.ts';
 import { WorldTheater } from './components/WorldTheater.tsx';
 import { HotDecisions } from './components/HotDecisions.tsx';
 import { generateNarrative } from './narrative.ts';
@@ -90,10 +93,47 @@ export default function App() {
   const [lastNarrative, setLastNarrative] = useState<string>('');
   const [expandedCountry, setExpandedCountry] = useState<string | null>(null);
 
+  // Multiplayer
+  const [showMpLobby, setShowMpLobby] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.has('room');
+  });
+  const [prefillRoomCode] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('room') ?? undefined;
+  });
+  const [mpRoom, setMpRoom] = useState<string | null>(null);
+  const [mpUid, setMpUid] = useState<string>('');
+  const { ctx: mpCtx, syncState: mpSyncState, submitTurn: mpSubmitTurn, clearReady: mpClearReady } = useMultiplayer(mpRoom, mpUid);
+  const isMultiplayer = !!mpRoom;
+
   // Persist on every meaningful change.
   useEffect(() => {
-    if (gameState.gameStarted) saveGameState(gameState);
+    if (!gameState.gameStarted) return;
+    if (isMultiplayer) {
+      // In multiplayer, host syncs to Firebase; non-host reads from it
+      if (mpCtx?.isHost) mpSyncState(gameState);
+    } else {
+      saveGameState(gameState);
+    }
   }, [gameState]);
+
+  // Non-host: when Firebase state updates with a new turn, adopt it
+  useEffect(() => {
+    if (!mpCtx || mpCtx.isHost) return;
+    const remoteState = mpCtx.room.state;
+    if (!remoteState) return;
+    if (remoteState.turn !== gameState.turn || !gameState.gameStarted) {
+      setGameState(remoteState);
+      if (remoteState.turn > gameState.turn) setRecapOpen(true);
+    }
+  }, [mpCtx?.room.state?.turn]);
+
+  // Host: when all players are ready, auto-advance the turn
+  useEffect(() => {
+    if (!mpCtx?.allReady || !mpCtx.isHost || isProcessing || gameState.outcome) return;
+    mpClearReady().then(() => nextTurn());
+  }, [mpCtx?.allReady]);
 
   const playerCountry = useMemo(
     () => gameState.countries.find(c => c.id === gameState.playerCountryId),
@@ -778,6 +818,17 @@ export default function App() {
                 <p className="text-slate-400 text-sm md:text-xl max-w-2xl mx-auto">Assuming control of a superpower requires absolute resolve. Choose your theater of operations.</p>
               </div>
 
+              {/* Multiplayer entry */}
+              <div className="flex justify-center mb-6">
+                <button
+                  onClick={() => setShowMpLobby(true)}
+                  className="flex items-center gap-2 px-6 py-3 bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-blue-500/50 text-white rounded-2xl font-bold transition-all text-sm"
+                >
+                  <Users size={16} className="text-blue-400" />
+                  Play Multiplayer — invite friends
+                </button>
+              </div>
+
               <CountrySelector onSelect={startGame} />
             </div>
           </motion.div>
@@ -830,19 +881,36 @@ export default function App() {
                   >
                     <RotateCcw size={14} /> Reset
                   </button>
-                  <motion.button
-                    whileTap={{ scale: 0.95 }}
-                    onClick={recapOpen ? () => setRecapOpen(false) : nextTurn}
-                    disabled={isProcessing || !!gameState.outcome}
-                    className={`flex items-center justify-center w-10 h-10 md:w-auto md:px-6 md:py-2.5 text-white font-bold rounded-lg transition-all shadow-lg disabled:opacity-50 ${recapOpen ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-blue-600 hover:bg-blue-500'}`}
-                  >
-                    {isProcessing
-                      ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      : recapOpen
-                        ? <><CheckCircle2 size={18} /><span className="hidden md:inline ml-2">ACKNOWLEDGE</span></>
-                        : <><Play size={18} fill="currentColor" /><span className="hidden md:inline ml-2">NEXT MONTH</span></>
-                    }
-                  </motion.button>
+                  {isMultiplayer && mpCtx && !recapOpen ? (
+                    /* Multiplayer: Submit Turn button */
+                    <motion.button
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => { if (!mpCtx.me?.readyForTurn) mpSubmitTurn(); }}
+                      disabled={isProcessing || !!gameState.outcome || !!mpCtx.me?.readyForTurn}
+                      className={`flex items-center justify-center gap-2 px-4 py-2.5 text-white font-bold rounded-lg transition-all shadow-lg text-sm disabled:opacity-60 ${
+                        mpCtx.me?.readyForTurn ? 'bg-emerald-700 cursor-default' : 'bg-amber-600 hover:bg-amber-500'
+                      }`}
+                    >
+                      {mpCtx.me?.readyForTurn
+                        ? <><CheckCircle2 size={16} /><span className="hidden md:inline">READY ({mpCtx.humanPlayers.filter(p=>p.readyForTurn).length}/{mpCtx.humanPlayers.length})</span></>
+                        : <><Users size={16} /><span className="hidden md:inline">SUBMIT TURN</span></>
+                      }
+                    </motion.button>
+                  ) : (
+                    <motion.button
+                      whileTap={{ scale: 0.95 }}
+                      onClick={recapOpen ? () => setRecapOpen(false) : nextTurn}
+                      disabled={isProcessing || !!gameState.outcome || (isMultiplayer && !mpCtx?.isHost)}
+                      className={`flex items-center justify-center w-10 h-10 md:w-auto md:px-6 md:py-2.5 text-white font-bold rounded-lg transition-all shadow-lg disabled:opacity-50 ${recapOpen ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-blue-600 hover:bg-blue-500'}`}
+                    >
+                      {isProcessing
+                        ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        : recapOpen
+                          ? <><CheckCircle2 size={18} /><span className="hidden md:inline ml-2">ACKNOWLEDGE</span></>
+                          : <><Play size={18} fill="currentColor" /><span className="hidden md:inline ml-2">NEXT MONTH</span></>
+                      }
+                    </motion.button>
+                  )}
                 </div>
               </div>
             </header>
@@ -1093,6 +1161,28 @@ export default function App() {
               )}
             </AnimatePresence>
           </div>
+        )}
+      </AnimatePresence>
+
+      {/* Multiplayer Lobby overlay */}
+      <AnimatePresence>
+        {showMpLobby && (
+          <MultiplayerLobby
+            prefillCode={prefillRoomCode}
+            onBack={() => setShowMpLobby(false)}
+            onGameStart={(roomCode, uid, countryId, isHostPlayer, initialState) => {
+              setShowMpLobby(false);
+              setMpRoom(roomCode);
+              setMpUid(uid);
+              if (initialState) {
+                // Host: start with the built initial state
+                // Non-host: adopt the state from Firebase
+                const stateForMe = { ...initialState, playerCountryId: countryId };
+                setGameState(stateForMe);
+                setShowBriefing(true);
+              }
+            }}
+          />
         )}
       </AnimatePresence>
     </div>
