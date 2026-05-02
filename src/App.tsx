@@ -92,7 +92,6 @@ export default function App() {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [breakingNews, setBreakingNews] = useState<BreakingNewsItem | null>(null);
   const [lastNarrative, setLastNarrative] = useState<string>('');
-  const [expandedCountry, setExpandedCountry] = useState<string | null>(null);
 
   // Multiplayer
   const [showMpLobby, setShowMpLobby] = useState(() => {
@@ -968,33 +967,12 @@ export default function App() {
                     >
                       <div className="grid lg:grid-cols-[minmax(0,1fr)_300px] gap-6">
                         <div className="space-y-6 min-w-0">
-                          {/* Quick-action theater view */}
+                          {/* World Theater: tap any country to expand actions inline */}
                           <WorldTheater
                             gameState={gameState}
                             player={playerCountry!}
                             onAction={(countryId, action) => performAction(countryId, action)}
-                            onOpenCountry={(id) => setExpandedCountry(expandedCountry === id ? null : id)}
                           />
-
-                          {/* Expanded detail: full CountryEntry for selected country */}
-                          {expandedCountry && (() => {
-                            const ec = gameState.countries.find(c => c.id === expandedCountry);
-                            return ec ? (
-                              <div className="border-t border-slate-800 pt-4">
-                                <div className="flex items-center justify-between mb-3">
-                                  <span className="text-xs font-black uppercase text-slate-400 tracking-widest">
-                                    {ec.flag} {ec.name} — Full Dossier
-                                  </span>
-                                  <button onClick={() => setExpandedCountry(null)} className="text-slate-500 hover:text-white text-xs">✕ Close</button>
-                                </div>
-                                <CountryEntry
-                                  country={ec}
-                                  player={playerCountry!}
-                                  onAction={(action) => performAction(ec.id, action as ActionType)}
-                                />
-                              </div>
-                            ) : null;
-                          })()}
                         </div>
 
                         <div className="lg:sticky lg:top-4 self-start space-y-4">
