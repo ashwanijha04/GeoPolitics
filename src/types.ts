@@ -212,6 +212,7 @@ export interface GameState {
   regionalConflicts: RegionalConflict[];
   worldTension: number;       // 0–100; rises with conflict, falls with diplomacy
   activeCrisis?: ActiveCrisis;
+  lastActionAt: number;       // ms timestamp — any action updates this, forcing sync
 }
 
 export interface Toast {

@@ -221,6 +221,9 @@ export function runStrategicAiActions(
     const actor = countries[i];
     if (actor.id === state.playerCountryId) continue;
 
+    // Only ~55% of countries make a strategic decision each turn — makes the world feel less mechanical
+    if (Math.random() > 0.55) continue;
+
     const decision = pickDecision(actor, countries, state);
     if (!decision) continue;
 

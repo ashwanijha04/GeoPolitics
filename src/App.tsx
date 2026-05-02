@@ -69,6 +69,7 @@ const INITIAL_STATE: GameState = {
   regionalConflicts: INITIAL_REGIONAL_CONFLICTS.map(c => ({ ...c })),
   worldTension: 45,
   activeCrisis: undefined,
+  lastActionAt: 0,
 };
 
 function snapshot(country: Country, turn: number): HistoryPoint {
@@ -129,27 +130,16 @@ export default function App() {
     const remote = mpCtx.room.state;
     if (!remote) return;
 
-    // Deserialize to fix Firebase array→object conversion
     const safe = deserializeGameState(remote);
 
     setGameState(prev => {
-      // Skip if nothing meaningful changed
-      if (
-        safe.turn === prev.turn &&
-        safe.worldTension === prev.worldTension &&
-        safe.newsLog.length === prev.newsLog.length &&
-        safe.countries.every((rc, i) => {
-          const lc = prev.countries[i];
-          return lc &&
-            rc.resources.gdp === lc.resources.gdp &&
-            rc.resources.stability === lc.resources.stability &&
-            rc.resources.militaryPower === lc.resources.militaryPower &&
-            rc.stanceTowardsPlayer === lc.stanceTowardsPlayer;
-        })
-      ) return prev;
+      // Use lastActionAt as the authoritative "something changed" signal.
+      // Also catch turn advances. Ignore pure echoes of our own state.
+      const actionChanged = (safe.lastActionAt ?? 0) > (prev.lastActionAt ?? 0);
+      const turnChanged   = safe.turn > prev.turn;
+      if (!actionChanged && !turnChanged) return prev;
 
-      const wasNewTurn = safe.turn > prev.turn;
-      if (wasNewTurn) setTimeout(() => setRecapOpen(true), 50);
+      if (turnChanged) setTimeout(() => setRecapOpen(true), 50);
 
       return {
         ...safe,
@@ -208,6 +198,7 @@ export default function App() {
       regionalConflicts: INITIAL_REGIONAL_CONFLICTS.map(c => ({ ...c })),
       worldTension: 45,
       activeCrisis: undefined,
+      lastActionAt: Date.now(),
     });
     setShowBriefing(true);
   };
@@ -476,6 +467,7 @@ export default function App() {
         spaceAchievements: newAchievements,
         regionalConflicts: prev.regionalConflicts ?? INITIAL_REGIONAL_CONFLICTS,
         worldTension: calcWorldTension(prev.worldTension ?? 45, allAiActions),
+        lastActionAt: Date.now(),
       };
       // Assign activeCrisis AFTER next is built — generateCrisis reads next's full state
       if (!prev.activeCrisis) {
@@ -791,6 +783,21 @@ export default function App() {
         ? generateActionTweets(prev, action, countryId, true)
         : [];
 
+      // Announce player's own action into the feed so other players see it
+      const playerAnnouncement = actionSucceeded ? [{
+        id: `player_${prev.turn}_${Date.now()}`,
+        turn: prev.turn,
+        countryId: prev.playerCountryId,
+        leaderName: player.name,
+        leaderHandle: `@${prev.playerCountryId}`,
+        flag: player.flag,
+        content: logMessage,
+        likes: Math.floor(Math.random() * 20000) + 100,
+        retweets: Math.floor(Math.random() * 5000) + 50,
+        tone: (toastType === 'success' ? 'praise' : toastType === 'warning' ? 'warning' : 'event') as Tweet['tone'],
+        isClassified: false,
+      }] : [];
+
       const next: GameState = {
         ...prev,
         countries: updatedCountries,
@@ -799,7 +806,8 @@ export default function App() {
           { turn: prev.turn, countryName: target.name, action, message: logMessage },
         ],
         newsLog: [...prev.newsLog, logMessage],
-        tweetFeed: [...(prev.tweetFeed ?? []), ...newTweets].slice(-80),
+        tweetFeed: [...(prev.tweetFeed ?? []), ...playerAnnouncement, ...newTweets].slice(-100),
+        lastActionAt: actionSucceeded ? Date.now() : prev.lastActionAt,
       };
       next.outcome = evaluateOutcome(next) ?? undefined;
       return next;

@@ -40,6 +40,50 @@ const PERSONALITIES: Record<string, PersonalityType> = {
   'nigeria':      'resource-state',
 };
 
+// Probability that a country acts each turn, based on personality
+const ACTION_PROBABILITY: Record<PersonalityType, number> = {
+  'nato-ally':        0.55,
+  'rival-superpower': 0.85,
+  'volatile-rogue':   0.70,
+  'pragmatic-neutral':0.45,
+  'pariah':           0.75,
+  'rising-power':     0.60,
+  'resource-state':   0.50,
+  'war-state':        0.80,
+};
+
+// How much past hostile/cooperative actions shift stance (decision memory)
+export function applyDecisionMemory(countries: Country[], history: GameState['actionHistory']): Country[] {
+  const HOSTILE_ACTS = new Set(['Military', 'War', 'Propaganda', 'Intel', 'Sanction']);
+  const FRIENDLY_ACTS = new Set(['Trade', 'Aid', 'Alliance', 'Research', 'ArmsTrade']);
+  const STANCE_ORDER: Country['stanceTowardsPlayer'][] = ['Ally', 'Friendly', 'Neutral', 'Suspicious', 'Hostile', 'At War'];
+
+  // Count recent (last 6 turns) actions per target country
+  const hostileCount: Record<string, number> = {};
+  const friendlyCount: Record<string, number> = {};
+
+  for (const r of history.slice(-6)) {
+    if (HOSTILE_ACTS.has(r.action)) hostileCount[r.countryName] = (hostileCount[r.countryName] ?? 0) + 1;
+    if (FRIENDLY_ACTS.has(r.action)) friendlyCount[r.countryName] = (friendlyCount[r.countryName] ?? 0) + 1;
+  }
+
+  return countries.map(c => {
+    const hCount = hostileCount[c.name] ?? 0;
+    const fCount = friendlyCount[c.name] ?? 0;
+    if (hCount === 0 && fCount === 0) return c;
+
+    const curIdx = STANCE_ORDER.indexOf(c.stanceTowardsPlayer);
+    let newIdx = curIdx;
+
+    // Grudgers remember: hostile actions push stance worse permanently
+    if (hCount >= 3) newIdx = Math.min(STANCE_ORDER.length - 1, curIdx + 1);
+    else if (fCount >= 3) newIdx = Math.max(0, curIdx - 1);
+
+    if (newIdx === curIdx) return c;
+    return { ...c, stanceTowardsPlayer: STANCE_ORDER[newIdx] };
+  });
+}
+
 export function runAiCountryActions(state: GameState): { updatedCountries: Country[]; actions: AiCountryAction[] } {
   const countries = state.countries.map(c => ({ ...c, resources: { ...c.resources } }));
   const actions: AiCountryAction[] = [];
@@ -47,11 +91,32 @@ export function runAiCountryActions(state: GameState): { updatedCountries: Count
   if (playerIdx === -1) return { updatedCountries: countries, actions };
   const player = countries[playerIdx];
 
+  // Apply decision memory: countries shift stance based on recent player actions
+  const withMemory = applyDecisionMemory(countries, state.actionHistory);
+  for (let i = 0; i < countries.length; i++) {
+    if (withMemory[i].stanceTowardsPlayer !== countries[i].stanceTowardsPlayer) {
+      countries[i] = { ...countries[i], stanceTowardsPlayer: withMemory[i].stanceTowardsPlayer };
+      const direction = withMemory[i].stanceTowardsPlayer > countries[i].stanceTowardsPlayer ? 'worsened' : 'improved';
+      actions.push({
+        countryId: countries[i].id,
+        countryName: countries[i].name,
+        description: `${countries[i].name} has adjusted its stance based on your recent track record. Relations ${direction}.`,
+        hostile: direction === 'worsened',
+        isBilateral: false,
+      });
+    }
+  }
+
   for (let i = 0; i < countries.length; i++) {
     const c = countries[i];
     if (c.id === state.playerCountryId) continue;
 
     const personality = PERSONALITIES[c.id] ?? 'pragmatic-neutral';
+
+    // Not every country acts every turn — probability by personality
+    const prob = ACTION_PROBABILITY[personality] ?? 0.5;
+    if (Math.random() > prob) continue;
+
     const roll = Math.random();
 
     switch (personality) {
